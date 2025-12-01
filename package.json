@@ -1,0 +1,48 @@
+{
+	"name": "agentic-testing",
+	"displayName": "Agentic Testing Pipeline",
+	"description": "AI-powered automated Python testing pipeline with three specialized agents for test generation, implementation, and evaluation",
+	"version": "1.0.0",
+	"author": "galalqassas",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/galalqassas/agenticTesting"
+	},
+	"engines": {
+		"node": ">=18.0.0",
+		"vscode": "^1.80.0"
+	},
+	"main": "./dist/extension.js",
+	"scripts": {
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./",
+		"lint": "eslint src --ext ts,tsx",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"build": "npm run compile"
+	},
+	"dependencies": {
+		"@vscode/l10n": "^0.0.18",
+		"@vscode/prompt-tsx": "^0.3.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"@types/vscode": "^1.80.0",
+		"typescript": "^5.0.0",
+		"vitest": "^1.0.0",
+		"eslint": "^8.0.0",
+		"@typescript-eslint/eslint-plugin": "^6.0.0",
+		"@typescript-eslint/parser": "^6.0.0"
+	},
+	"keywords": [
+		"testing",
+		"python",
+		"pytest",
+		"ai",
+		"automation",
+		"code-coverage",
+		"security-analysis",
+		"test-generation"
+	]
+}

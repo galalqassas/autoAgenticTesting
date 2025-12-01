@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.coverage
+.coveragerc
+coverage.json
+htmlcov/
+*.spec
+build/
+dist/
+*.egg-info/
+
+# Node.js / TypeScript
+node_modules/
+out/
+*.tsbuildinfo
+
+# VS Code
+.vscode-test/
+
+# Environment & Secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+
+# Test artifacts
+tests/test_generated_*.py
+tests/prompts_*.json
