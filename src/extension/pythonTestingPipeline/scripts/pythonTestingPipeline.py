@@ -427,35 +427,119 @@ class PythonTestingPipeline:
 
         return code
 
-    def _validate_syntax(self, code: str) -> tuple[bool, str]:
-        """Validates Python syntax. Returns (is_valid, error_message)."""
+    def _validate_syntax(self, code: str) -> tuple[bool, str, Optional[dict]]:
+        """
+        Validates Python syntax.
+
+        Returns:
+            tuple: (is_valid, error_message, error_details)
+            error_details is a dict with keys: lineno, offset, text, msg
+        """
         try:
             import ast
 
             ast.parse(code)
-            return True, ""
+            return True, "", None
         except SyntaxError as e:
-            return False, f"Line {e.lineno}: {e.msg}"
+            error_details = {
+                "lineno": e.lineno or 0,
+                "offset": e.offset or 0,
+                "text": e.text or "",
+                "msg": e.msg or "Unknown syntax error",
+            }
+            error_msg = f"Line {e.lineno}: {e.msg}"
+            if e.offset:
+                error_msg += f" (column {e.offset})"
+            return False, error_msg, error_details
 
-    def _fix_syntax_errors(self, code: str, error_msg: str, codebase_path: Path) -> str:
-        """Asks LLM to fix syntax errors in generated code."""
+    def _fix_syntax_errors(
+        self, code: str, error_msg: str, codebase_path: Path, error_details: dict = None
+    ) -> str:
+        """
+        Asks LLM to fix syntax errors in generated code with enhanced context.
+
+        Args:
+            code: The code with syntax errors
+            error_msg: The error message
+            codebase_path: Path to the codebase being tested
+            error_details: Optional dict with detailed error information
+        """
         print(f"   ⚠️ Syntax error detected: {error_msg}")
         print("   🔧 Attempting to fix...")
 
+        # Extract context window around the error
+        code_lines = code.splitlines()
+        context_window = ""
+
+        if error_details and error_details.get("lineno"):
+            error_line = error_details["lineno"]
+            error_col = error_details.get("offset", 0)
+
+            # Show ±5 lines around the error
+            start_line = max(1, error_line - 5)
+            end_line = min(len(code_lines), error_line + 5)
+
+            context_lines = []
+            for i in range(start_line, end_line + 1):
+                line_num = i
+                line_content = code_lines[i - 1] if i <= len(code_lines) else ""
+
+                # Mark the error line with >>>
+                if i == error_line:
+                    marker = ">>> "
+                    # Add column marker if available
+                    if error_col > 0:
+                        context_lines.append(f"{marker}{line_num:3d}: {line_content}")
+                        context_lines.append(
+                            f"         {' ' * (error_col - 1)}^ ERROR HERE"
+                        )
+                    else:
+                        context_lines.append(
+                            f"{marker}{line_num:3d}: {line_content}  # <-- ERROR HERE"
+                        )
+                else:
+                    context_lines.append(f"    {line_num:3d}: {line_content}")
+
+            context_window = "\n".join(context_lines)
+        else:
+            # Fallback: show first 20 lines with line numbers
+            context_lines = [
+                f"    {i + 1:3d}: {line}" for i, line in enumerate(code_lines[:20])
+            ]
+            context_window = "\n".join(context_lines)
+            if len(code_lines) > 20:
+                context_window += f"\n    ... ({len(code_lines) - 20} more lines)"
+
+        # Use chunked reading for source context
         python_files = self.gather_python_files(codebase_path)
-        source_context = self.read_file_contents(python_files[:5])
+        source_chunks = self.read_file_contents_chunked(python_files)
+        source_context = "\n\n".join(source_chunks[:2])  # First 2 chunks
 
-        fix_prompt = f"""The following Python test code has a syntax error:
+        fix_prompt = f"""SYNTAX ERROR DETECTED IN GENERATED TEST CODE
 
-Error: {error_msg}
+ERROR DETAILS:
+  Type: SyntaxError
+  Message: {error_msg}
+  {f"Line: {error_details['lineno']}, Column: {error_details['offset']}" if error_details else ""}
 
-Problematic code:
-{code[:2000]}...
+PROBLEMATIC CODE SECTION:
+{context_window}
 
-Source code being tested:
-{source_context[:2000]}
+FULL GENERATED CODE:
+{code}
 
-Fix the syntax error and return ONLY valid Python code. Do NOT include markdown code fences (``` or ```python). Return raw Python code only."""
+SOURCE CODE BEING TESTED (for reference):
+{source_context[:1500]}
+
+INSTRUCTIONS:
+Your task is to fix the syntax error in the test code above.
+1. Identify the exact syntax issue based on the error location and message
+2. Fix ONLY the syntax error (maintain all test logic)
+3. Return ONLY valid Python code with NO markdown formatting
+4. Do NOT include code fences (``` or ```python)
+5. Return the complete, corrected test file
+
+Return the fixed code now:"""
 
         response = self._call_llm(
             IMPLEMENTATION_SYSTEM_PROMPT, fix_prompt, agent_name="syntax_fixer"
@@ -507,31 +591,160 @@ Fix the syntax error and return ONLY valid Python code. Do NOT include markdown 
                 print(f"Warning: Could not read {file_path}: {e}")
         return "\n\n".join(contents)
 
-    def identify_test_scenarios(self, codebase_path: Path) -> TestScenariosOutput:
-        """Agent 1: Identifies test scenarios from the codebase."""
-        print("\n🔍 Agent 1: Identifying test scenarios...")
+    def read_file_contents_chunked(
+        self, files: list[Path], max_lines_per_chunk: int = 200
+    ) -> list[str]:
+        """
+        Reads files and chunks them by logical boundaries (functions/classes).
 
-        python_files = self.gather_python_files(codebase_path)
-        if not python_files:
-            raise ValueError(f"No Python files found in {codebase_path}")
+        Args:
+            files: List of Python files to read
+            max_lines_per_chunk: Target maximum lines per chunk (default: 200)
 
-        print(f"   Found {len(python_files)} Python files to analyze")
+        Returns:
+            List of code chunks, each containing logical units under ~max_lines_per_chunk
+        """
+        import ast
 
-        code_content = self.read_file_contents(python_files)
-        file_list = "\n".join(str(f) for f in python_files)
+        chunks = []
 
-        user_prompt = f"""Analyze this Python codebase and identify test scenarios.
+        for file_path in files:
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    file_content = f.read()
+                    file_lines = file_content.splitlines()
 
-Files: {file_list}
+                # Try to parse with AST
+                try:
+                    tree = ast.parse(file_content)
 
-Code:
-{code_content}
+                    # Extract top-level definitions with their line ranges
+                    definitions = []
+                    for node in ast.iter_child_nodes(tree):
+                        if isinstance(
+                            node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)
+                        ):
+                            # Get the line range of this definition
+                            start_line = node.lineno - 1  # Convert to 0-indexed
+                            end_line = (
+                                node.end_lineno if node.end_lineno else start_line + 1
+                            )
+
+                            definitions.append(
+                                {
+                                    "type": node.__class__.__name__,
+                                    "name": node.name,
+                                    "start": start_line,
+                                    "end": end_line,
+                                    "lines": end_line - start_line,
+                                }
+                            )
+
+                    # Group definitions into chunks
+                    if definitions:
+                        current_chunk_defs = []
+                        current_chunk_lines = 0
+
+                        for defn in definitions:
+                            # If adding this definition exceeds the limit and we have existing defs
+                            if (
+                                current_chunk_lines + defn["lines"]
+                                > max_lines_per_chunk
+                                and current_chunk_defs
+                            ):
+                                # Flush current chunk
+                                start_idx = current_chunk_defs[0]["start"]
+                                end_idx = current_chunk_defs[-1]["end"]
+                                chunk_content = "\n".join(file_lines[start_idx:end_idx])
+                                chunks.append(f"# File: {file_path}\n{chunk_content}")
+
+                                # Start new chunk with current definition
+                                current_chunk_defs = [defn]
+                                current_chunk_lines = defn["lines"]
+                            else:
+                                # Add to current chunk
+                                current_chunk_defs.append(defn)
+                                current_chunk_lines += defn["lines"]
+
+                        # Flush remaining chunk
+                        if current_chunk_defs:
+                            start_idx = current_chunk_defs[0]["start"]
+                            end_idx = current_chunk_defs[-1]["end"]
+                            chunk_content = "\n".join(file_lines[start_idx:end_idx])
+                            chunks.append(f"# File: {file_path}\n{chunk_content}")
+                    else:
+                        # No definitions found, chunk by line count
+                        for i in range(0, len(file_lines), max_lines_per_chunk):
+                            chunk_lines = file_lines[i : i + max_lines_per_chunk]
+                            chunks.append(
+                                f"# File: {file_path} (lines {i + 1}-{i + len(chunk_lines)})\n"
+                                + "\n".join(chunk_lines)
+                            )
+
+                except SyntaxError:
+                    # If AST parsing fails, fall back to simple line-based chunking
+                    print(
+                        f"   ⚠️  Could not parse {file_path.name}, using line-based chunking"
+                    )
+                    for i in range(0, len(file_lines), max_lines_per_chunk):
+                        chunk_lines = file_lines[i : i + max_lines_per_chunk]
+                        chunks.append(
+                            f"# File: {file_path} (lines {i + 1}-{i + len(chunk_lines)})\n"
+                            + "\n".join(chunk_lines)
+                        )
+
+            except Exception as e:
+                print(f"   Warning: Could not read {file_path}: {e}")
+
+        return chunks
+
+    def _process_chunk_for_scenarios(
+        self, chunk_idx: int, code_chunk: str, file_list: str, total_chunks: int
+    ) -> list[TestScenario]:
+        """
+        Process a single code chunk to identify test scenarios.
+        This method is designed to be called in parallel.
+
+        Args:
+            chunk_idx: Index of the chunk (1-indexed for display)
+            code_chunk: The code content to analyze
+            file_list: List of all files in the project
+            total_chunks: Total number of chunks
+
+        Returns:
+            List of TestScenario objects identified from this chunk
+        """
+        # Create a dedicated LLM client for this thread/worker
+        # Each worker gets its own client with independent API key rotation
+        llm_client = create_llm_client(use_mock_on_failure=True)
+
+        print(f"   Processing chunk {chunk_idx}/{total_chunks}...")
+
+        user_prompt = f"""Analyze this Python codebase chunk and identify test scenarios.
+
+Files in project: {file_list}
+
+Code chunk {chunk_idx} of {total_chunks}:
+{code_chunk}
 
 Respond with JSON containing test_scenarios."""
 
-        response = self._call_llm(
-            IDENTIFICATION_SYSTEM_PROMPT, user_prompt, agent_name="identification_agent"
-        )
+        response, is_mock = llm_client.call(IDENTIFICATION_SYSTEM_PROMPT, user_prompt)
+
+        # Record this prompt in history (same as _call_llm does)
+        import time as time_module
+
+        timestamp = time_module.strftime("%Y-%m-%d %H:%M:%S")
+        prompt_record = {
+            "timestamp": timestamp,
+            "agent": "identification_agent",
+            "model": llm_client.current_model,
+            "system_prompt": IDENTIFICATION_SYSTEM_PROMPT,
+            "user_prompt": user_prompt,
+            "response": response,
+            "is_mock": is_mock,
+        }
+        self.prompt_history.append(prompt_record)
 
         try:
             if "```" in response:
@@ -540,10 +753,81 @@ Respond with JSON containing test_scenarios."""
                     response = json_match.group(1).strip()
 
             data = json.loads(response)
-            scenarios = [TestScenario(**s) for s in data["test_scenarios"]]
-            return TestScenariosOutput(test_scenarios=scenarios)
+            chunk_scenarios = [TestScenario(**s) for s in data["test_scenarios"]]
+            return chunk_scenarios
         except (json.JSONDecodeError, KeyError) as e:
-            raise ValueError(f"Failed to parse response: {e}")
+            print(f"   ⚠️  Warning: Failed to parse response for chunk {chunk_idx}: {e}")
+            return []
+
+    def identify_test_scenarios(self, codebase_path: Path) -> TestScenariosOutput:
+        """Agent 1: Identifies test scenarios from the codebase using parallel processing."""
+        print("\n🔍 Agent 1: Identifying test scenarios...")
+
+        python_files = self.gather_python_files(codebase_path)
+        if not python_files:
+            raise ValueError(f"No Python files found in {codebase_path}")
+
+        print(f"   Found {len(python_files)} Python files to analyze")
+
+        # Use chunked reading
+        code_chunks = self.read_file_contents_chunked(python_files)
+        print(f"   Split into {len(code_chunks)} logical chunks")
+
+        file_list = "\n".join(str(f) for f in python_files)
+        all_scenarios = []
+
+        # Process chunks in parallel using ThreadPoolExecutor
+        # Limit workers to avoid overwhelming the API and to match available API keys
+        max_workers = min(5, len(code_chunks))
+
+        if len(code_chunks) > 1:
+            print(f"   Using {max_workers} parallel workers for faster processing")
+
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all chunks for processing
+                future_to_chunk = {
+                    executor.submit(
+                        self._process_chunk_for_scenarios,
+                        idx + 1,
+                        chunk,
+                        file_list,
+                        len(code_chunks),
+                    ): idx + 1
+                    for idx, chunk in enumerate(code_chunks)
+                }
+
+                # Collect results as they complete
+                for future in as_completed(future_to_chunk):
+                    chunk_idx = future_to_chunk[future]
+                    try:
+                        scenarios = future.result()
+                        all_scenarios.extend(scenarios)
+                    except Exception as e:
+                        print(f"   ⚠️  Error processing chunk {chunk_idx}: {e}")
+        else:
+            # Single chunk - no need for parallelization
+            scenarios = self._process_chunk_for_scenarios(
+                1, code_chunks[0], file_list, 1
+            )
+            all_scenarios.extend(scenarios)
+
+        # Deduplicate scenarios based on description similarity
+        unique_scenarios = []
+        seen_descriptions = set()
+
+        for scenario in all_scenarios:
+            # Normalize description for comparison
+            normalized = scenario.scenario_description.lower().strip()
+            if normalized not in seen_descriptions:
+                seen_descriptions.add(normalized)
+                unique_scenarios.append(scenario)
+
+        print(
+            f"   Identified {len(all_scenarios)} scenarios ({len(unique_scenarios)} unique)"
+        )
+        return TestScenariosOutput(test_scenarios=unique_scenarios)
 
     def request_approval(self, scenarios: TestScenariosOutput) -> TestScenariosOutput:
         """
@@ -590,7 +874,21 @@ Respond with JSON containing test_scenarios."""
         print("\n🔧 Agent 2: Generating PyTest test code...")
 
         python_files = self.gather_python_files(codebase_path)
-        code_context = self.read_file_contents(python_files[:10])
+
+        # Use chunked reading and limit to reasonable amount
+        code_chunks = self.read_file_contents_chunked(python_files)
+        # Take first 5 chunks (~1000 lines) to provide enough context without exceeding tokens
+        max_chunks = 5
+        selected_chunks = code_chunks[:max_chunks]
+        code_context = "\n\n".join(selected_chunks)
+
+        chunk_info = (
+            f"{len(selected_chunks)} of {len(code_chunks)} code chunks"
+            if len(code_chunks) > max_chunks
+            else f"{len(code_chunks)} code chunks"
+        )
+        print(f"   Using {chunk_info} for context")
+
         scenarios_json = json.dumps(asdict(scenarios), indent=2)
 
         # Build file list for the AI to understand the project structure
@@ -616,7 +914,7 @@ WINDOWS COMPATIBILITY:
 - Use `proc.terminate()` or `proc.kill()` to stop subprocesses
 - For keyboard interrupt tests, mock the behavior instead of sending real signals
 
-Source code:
+Source code (showing {chunk_info}):
 {code_context}
 
 IMPORTANT RULES:
@@ -636,13 +934,15 @@ Generate a complete, executable PyTest file."""
 
         # Validate syntax and fix if needed (up to 3 attempts)
         for attempt in range(3):
-            is_valid, error_msg = self._validate_syntax(test_code)
+            is_valid, error_msg, error_details = self._validate_syntax(test_code)
             if is_valid:
                 break
-            test_code = self._fix_syntax_errors(test_code, error_msg, codebase_path)
+            test_code = self._fix_syntax_errors(
+                test_code, error_msg, codebase_path, error_details
+            )
 
         # Final validation
-        is_valid, error_msg = self._validate_syntax(test_code)
+        is_valid, error_msg, error_details = self._validate_syntax(test_code)
         if not is_valid:
             print(f"   ⚠️ Warning: Generated code may have syntax errors: {error_msg}")
 
@@ -1123,13 +1423,15 @@ Generate a complete, executable PyTest file that:
 
         # Validate syntax and fix if needed
         for attempt in range(3):
-            is_valid, error_msg = self._validate_syntax(test_code)
+            is_valid, error_msg, error_details = self._validate_syntax(test_code)
             if is_valid:
                 break
-            test_code = self._fix_syntax_errors(test_code, error_msg, codebase_path)
+            test_code = self._fix_syntax_errors(
+                test_code, error_msg, codebase_path, error_details
+            )
 
         # Final validation
-        is_valid, error_msg = self._validate_syntax(test_code)
+        is_valid, error_msg, error_details = self._validate_syntax(test_code)
         if not is_valid:
             print(f"   ⚠️ Warning: Code may still have syntax errors: {error_msg}")
 
