@@ -1,0 +1,45 @@
+{
+  "pipeline_metrics": [
+    {
+      "iteration": 1,
+      "timestamp": "2025-12-02 01:37:01",
+      "execution_time_seconds": 15.0,
+      "code_coverage_percentage": 100.0,
+      "security_issues_count": 2,
+      "tests_total": 15,
+      "tests_passed": 9,
+      "tests_failed": 6
+    }
+  ],
+  "security_distribution": [
+    {
+      "type": "Potential information leakage on template rendering errors",
+      "count": 1,
+      "severity": "medium"
+    },
+    {
+      "type": "Lack of explicit input validation for query parameters",
+      "count": 1,
+      "severity": "medium"
+    }
+  ],
+  "security_issues_list": [
+    {
+      "severity": "medium",
+      "issue": "Potential information leakage on template rendering errors",
+      "location": "main.py:12 - read_root()",
+      "recommendation": "Add a custom exception handler for TemplateNotFound (and other rendering errors) that returns a generic 500 response without stack traces or file paths."
+    },
+    {
+      "severity": "medium",
+      "issue": "Lack of explicit input validation for query parameters",
+      "location": "main.py:12 - read_root() (request object is passed directly to the template)",
+      "recommendation": "Validate and sanitize any query parameters before passing them to the template, even if currently unused, to prevent future XSS or injection vectors."
+    }
+  ],
+  "summary": {
+    "total_iterations": 1,
+    "final_coverage": 100.0,
+    "final_security_issues": 2
+  }
+}

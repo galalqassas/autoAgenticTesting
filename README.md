@@ -1,59 +1,88 @@
 # Agentic Testing Pipeline
 
-AI-powered automated Python testing pipeline.
+An AI-powered automated testing pipeline that autonomously identifies test scenarios, generates PyTest scripts, and evaluates code coverage and security.
 
-**Input**: A Python codebase path (e.g., `./my_project`).
-**Output**: A comprehensive, executable PyTest suite (aiming for 90%+ coverage) and a security analysis report.
+## 🚀 Features
 
-## Overview
+- **🤖 Multi-Agent Architecture**:
+  - **Identification Agent**: Analyzes code to find critical paths, edge cases, and security risks.
+  - **Implementation Agent**: Generates executable, high-quality PyTest scripts.
+  - **Evaluation Agent**: Runs tests, measures coverage, and performs security analysis.
+- **📊 Interactive Dashboard**: Visualize pipeline metrics, code coverage, and agent conversations.
+- **🛡️ Security Analysis**: Identifies vulnerabilities like SQL injection, XSS, and more.
+- **📈 Automated Reporting**: Generates detailed JSON reports and visualization data.
 
-Three specialized AI agents work in sequence:
+## 🛠️ Prerequisites
 
-1.  **Identification Agent**: Finds test scenarios (edge cases, security, critical paths).
-2.  **Implementation Agent**: Generates PyTest scripts.
-3.  **Evaluation Agent**: Runs tests, checks coverage, and analyzes security.
+- **Python**: 3.10 or higher
+- **Node.js**: 18.0.0 or higher (for VS Code extension)
+- **API Keys**: OpenAI or Groq API key
 
-## Usage
+## 📦 Installation
 
-### CLI
+1.  **Clone the repository**:
+    ```bash
+    git clone <repository_url>
+    cd autoAgenticTesting
+    ```
 
-Run the standalone Python script:
+2.  **Install Python Dependencies**:
+    ```bash
+    pip install openai pytest pytest-cov fastapi uvicorn streamlit pandas plotly
+    ```
+
+3.  **Set up Environment Variables**:
+    Create a `.env` file in `src/extension/pythonTestingPipeline/scripts/` (or root) with your API keys:
+    ```ini
+    OPENAI_API_KEY=your_openai_key_here
+    # or
+    GROQ_API_KEY=your_groq_key_here
+    ```
+
+## 🏃 Usage
+
+### 1. Running the Testing Pipeline
+
+Run the standalone Python script to test a target codebase:
 
 ```bash
-python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <path_to_codebase>
+python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <path_to_target_codebase> [options]
 ```
 
-Options: `--coverage`, `--auto-approve`, `--no-run-tests`
+**Options:**
+- `--coverage`: Enable code coverage measurement.
+- `--auto-approve`: Automatically proceed without user confirmation.
+- `--no-run-tests`: Generate tests but do not execute them.
 
-### VS Code Extension
+**Example:**
+```bash
+python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py apps/web_timer --coverage --auto-approve
+```
 
-Run the command **"Agentic Testing: Generate Tests"** from the Command Palette.
+### 2. Launching the Dashboard
 
-### Development
+Visualize the results, coverage, and agent history:
 
 ```bash
-npm install
-npm run compile
-# Open in VS Code, then press F5 to run the extension
-
+cd dashboard
+pip install -r requirements.txt  # Ensure dashboard deps are installed
+python -m streamlit run app.py
 ```
 
-## Configuration
+The dashboard will open at `http://localhost:8501`.
 
-Set API keys in `.env` (supports OpenAI, Groq).
+### 3. VS Code Extension
 
-## Getting Started
+1.  Install dependencies: `npm install`
+2.  Compile: `npm run compile`
+3.  Run: Open in VS Code and press `F5` to launch the extension host.
+4.  Command: `Agentic Testing: Generate Tests`
 
-```bash
-# Clone or initialize the repository
-git clone <repository_url>
-# or
-git init
+## 📂 Project Structure
 
-# Install dependencies
-npm install
+- **`apps/`**: Example applications used for testing (e.g., `web_timer`).
+- **`dashboard/`**: Streamlit application for visualizing results.
+- **`src/extension/pythonTestingPipeline/scripts/`**: Core Python scripts for the agentic pipeline.
+- **`src/`**: TypeScript source code for the VS Code extension.
 
-# Set up API keys
-cp .env.example .env  # Create .env from example
-# Edit .env and add your API keys
-```
+For more information, please refer to the [Mini Paper](https://docs.google.com/document/d/1ri4d37M5Gi8h9ROnLbFPA4R8Abg7bfyj_fnCvEmfjX4/edit?tab=t.0).
