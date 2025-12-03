@@ -13,322 +13,37 @@ Example:
 """
 
 import argparse
-import importlib.metadata
+
 import json
-import os
+
 import re
-import subprocess
+
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
 # Import LLM configuration and client
 from llm_config import create_llm_client
-
 # ==================== Type Definitions ====================
 
-
-@dataclass
-class TestScenario:
-    """Represents a single test scenario."""
-
-    scenario_description: str
-    priority: str  # "High", "Medium", or "Low"
-
-
-@dataclass
-class TestScenariosOutput:
-    """Output from the Test Case Identification Agent."""
-
-    test_scenarios: list[TestScenario]
-
-
-@dataclass
-class ExecutionSummary:
-    """Summary of test execution."""
-
-    total_tests: int
-    passed: int
-    failed: int
-
-
-@dataclass
-class SecurityIssue:
-    """Represents a security issue found in the code."""
-
-    severity: str  # "critical", "high", "medium", "low"
-    issue: str
-    location: str
-    recommendation: str
-
-
-@dataclass
-class TestEvaluationOutput:
-    """Output from the Test Case Evaluation Agent."""
-
-    execution_summary: ExecutionSummary
-    code_coverage_percentage: float
-    actionable_recommendations: list[str]
-    security_issues: list[SecurityIssue] = None
-    has_severe_security_issues: bool = False
-
-    def __post_init__(self):
-        if self.security_issues is None:
-            self.security_issues = []
-
+from pipeline.models import (
+    TestScenariosOutput,
+    TestEvaluationOutput,
+)
 
 # ==================== System Prompts ====================
 
-IDENTIFICATION_SYSTEM_PROMPT = """### ROLE
-You are a Senior Software Quality Assurance Engineer specializing in Python.
-
-### OBJECTIVE
-Your primary goal is to analyze the given Python codebase and identify a comprehensive list of test scenarios, including critical edge cases, for human approval.
-
-### RULES & CONSTRAINTS
-- Focus exclusively on identifying test scenarios; do not generate test code.
-- Prioritize critical paths, common use cases, and edge cases (e.g., invalid inputs, empty values, concurrency issues).
-- If the code is unclear or incomplete, identify the ambiguity as a test scenario.
-
-### OUTPUT FORMAT
-- Provide the response as a single JSON object.
-- The JSON object should contain one key, "test_scenarios", which holds a list of test case objects.
-- Each test case object must include:
-    - "scenario_description": A concise string explaining the test case.
-    - "priority": A string with a value of "High", "Medium", or "Low".
-
-### EXAMPLE
-```json
-{
-  "test_scenarios": [
-    {
-      "scenario_description": "Test user login with valid credentials.",
-      "priority": "High"
-    },
-    {
-      "scenario_description": "Test user login with an invalid password.",
-      "priority": "High"
-    },
-    {
-      "scenario_description": "Test user login with an empty username field.",
-      "priority": "Medium"
-    }
-  ]
-}
-```"""
-
-IMPLEMENTATION_SYSTEM_PROMPT = """### ROLE
-You are a Senior Software Development Engineer in Test (SDET) specializing in Python and the PyTest framework.
-
-### OBJECTIVE
-Your goal is to generate executable PyTest test scripts based on an approved JSON list of test scenarios.
-
-### CRITICAL RULES
-- Return ONLY raw Python code - NO markdown formatting, NO code fences (``` or ```python)
-- The output must be valid Python that can be saved directly to a .py file
-- Use the PyTest framework for all generated tests
-- Write clean, readable, and maintainable code following PEP 8 standards
-- Ensure each test function is self-contained and starts with 'test_'
-- Include all necessary imports at the top of the file
-
-### CRITICAL: CODE COVERAGE REQUIREMENTS
-- For coverage to be measured, you MUST import and use the source code DIRECTLY in the test process
-- DO NOT run source files as subprocesses for testing - pytest-cov cannot measure subprocess coverage
-- IMPORT the source module and test its functions, classes, and behavior directly
-- Use mocking to isolate side effects (e.g., network, file I/O)
-- Example for testing a server module:
-  ```python
-  import sys
-  from pathlib import Path
-
-  # Add project root to path for imports
-  PROJECT_ROOT = Path(__file__).parent.parent
-  sys.path.insert(0, str(PROJECT_ROOT))
-
-  # Now import the source module directly
-  import server  # This will be measured by coverage
-
-  def test_handler_class():
-      # Test the Handler class directly
-      assert hasattr(server, 'Handler')
-      assert issubclass(server.Handler, http.server.SimpleHTTPRequestHandler)
-  ```
-
-### CRITICAL: TESTING `if __name__ == "__main__":` BLOCKS
-- Code inside `if __name__ == "__main__":` is NOT executed when importing the module
-- To test this code, use `exec()` or `runpy.run_path()` with mocks
-- IMPORTANT: When using runpy.run_path() to test server code, you MUST mock:
-  1. `socketserver.TCPServer` to prevent real server startup
-  2. The serve_forever() method to avoid blocking
-  3. Have the mock raise KeyboardInterrupt to simulate shutdown
-- Example pattern:
-  ```python
-  from unittest.mock import patch, MagicMock
-  import runpy
-
-  def test_main_block_starts_server():
-      # MUST mock TCPServer to prevent real server from starting!
-      mock_httpd = MagicMock()
-      mock_httpd.serve_forever.side_effect = KeyboardInterrupt()  # Simulate Ctrl+C
-
-      mock_context = MagicMock()
-      mock_context.__enter__.return_value = mock_httpd
-      mock_context.__exit__.return_value = None
-
-      with patch('socketserver.TCPServer', return_value=mock_context):
-          with patch('os.path.exists', return_value=True):
-              runpy.run_path(str(SERVER_SCRIPT), run_name="__main__")
-
-  def test_main_block_with_missing_directory():
-      with patch('os.path.exists', return_value=False):
-          with patch('builtins.exit') as mock_exit:
-              with patch('builtins.print'):
-                  try:
-                      runpy.run_path(str(SERVER_SCRIPT), run_name="__main__")
-                  except SystemExit:
-                      pass
-              mock_exit.assert_called_once_with(1)
-  ```
-
-### CRITICAL: TESTING http.server.SimpleHTTPRequestHandler SUBCLASSES
-- These handlers require real socket connections to initialize
-- NEVER call Handler(None, None, None) - it will fail
-- Use mocking or test the class attributes instead:
-  ```python
-  def test_handler_inheritance():
-      assert issubclass(server.Handler, http.server.SimpleHTTPRequestHandler)
-
-  def test_handler_init_sets_directory():
-      # Check __init__ method signature or use runpy to run server
-      import inspect
-      sig = inspect.signature(server.Handler.__init__)
-      # Verify it accepts the expected parameters
-  ```
-
-### IMPORTANT: FILE PATH HANDLING
-- The test file will be saved in a `tests/` subdirectory of the project
-- Add the project root to sys.path to enable imports: `sys.path.insert(0, str(PROJECT_ROOT))`
-- Then import source modules directly: `import mymodule`
-- For file path references, use: `Path(__file__).parent.parent / "filename.py"`
-
-### IMPORTANT: WINDOWS COMPATIBILITY
-- NEVER use `signal.SIGINT` to stop processes - it is NOT supported on Windows
-- To stop a subprocess, use `proc.terminate()` or `proc.kill()` instead
-- For tests that need to simulate keyboard interrupt, mock the behavior instead of sending signals
-
-### OUTPUT FORMAT
-- Return raw Python code only - no explanations, no markdown
-- The code must be syntactically correct and ready for execution
-- Function names should clearly reflect the scenario (e.g., `test_login_with_invalid_password`)
-
-### EXAMPLE OUTPUT (note: no code fences, just raw Python):
-import pytest
-import sys
-import runpy
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-# Add project root to path for imports
-PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-SERVER_SCRIPT = PROJECT_ROOT / "server.py"
-
-# Import source module directly (for coverage measurement)
-import server
-
-def test_handler_class_exists():
-    assert hasattr(server, 'Handler')
-
-def test_port_constant():
-    assert server.PORT == 8000
-
-def test_directory_constant():
-    assert server.DIRECTORY == 'dist'
-
-def test_handler_inheritance():
-    import http.server
-    assert issubclass(server.Handler, http.server.SimpleHTTPRequestHandler)
-
-def test_main_exits_when_directory_missing():
-    with patch('os.path.exists', return_value=False):
-        with patch('builtins.exit') as mock_exit:
-            with patch('builtins.print'):
-                try:
-                    runpy.run_path(str(SERVER_SCRIPT), run_name="__main__")
-                except SystemExit:
-                    pass
-            mock_exit.assert_called_once_with(1)"""
-
-EVALUATION_SYSTEM_PROMPT = """### ROLE
-You are a Principal Software Development Engineer in Test (SDET) with expertise in test automation analysis, code quality metrics, and security testing.
-
-### OBJECTIVE
-Your primary goal is to:
-1. Evaluate the results of a PyTest test suite execution
-2. Analyze test outcomes and measure code coverage
-3. Perform security analysis on the source code and test code
-4. Provide actionable recommendations to enhance testing quality and security
-
-### RULES & CONSTRAINTS
-- You will receive the PyTest execution report (pass/fail status), code coverage report, and source code.
-- Your analysis must identify security vulnerabilities in the code.
-- Recommendations must be specific, actionable, and aimed at improving test coverage, robustness, AND security.
-- Security issues should be classified by severity: "critical", "high", "medium", "low".
-- Critical/High severity issues MUST be addressed before the pipeline can complete.
-
-### SECURITY ANALYSIS FOCUS AREAS
-- SQL Injection vulnerabilities
-- Cross-Site Scripting (XSS)
-- Command Injection
-- Path Traversal attacks
-- Insecure deserialization
-- Hardcoded secrets/credentials
-- Insecure cryptographic practices
-- Missing input validation
-- Improper error handling that leaks sensitive info
-- Insecure dependencies
-
-### OUTPUT FORMAT
-- Provide the response as a single JSON object.
-- The JSON object must contain these keys:
-    - "execution_summary": An object containing integer values for "total_tests", "passed", and "failed".
-    - "code_coverage_percentage": A float value representing the total coverage (e.g., 92.5).
-    - "security_issues": A list of objects with "severity" (critical/high/medium/low), "issue", "location", and "recommendation".
-    - "has_severe_security_issues": Boolean - true if any critical or high severity issues exist.
-    - "actionable_recommendations": A list of concise strings for improving coverage and fixing issues.
-
-### EXAMPLE
-```json
-{
-  "execution_summary": {
-    "total_tests": 50,
-    "passed": 48,
-    "failed": 2
-  },
-  "code_coverage_percentage": 85.0,
-  "security_issues": [
-    {
-      "severity": "high",
-      "issue": "SQL Injection vulnerability",
-      "location": "database.py:45 - execute_query()",
-      "recommendation": "Use parameterized queries instead of string concatenation"
-    },
-    {
-      "severity": "medium",
-      "issue": "Missing input validation",
-      "location": "api.py:23 - get_user()",
-      "recommendation": "Validate and sanitize user_id parameter before use"
-    }
-  ],
-  "has_severe_security_issues": true,
-  "actionable_recommendations": [
-    "Fix the SQL injection vulnerability in database.py before deployment.",
-    "Add input validation tests for all API endpoints.",
-    "Increase test coverage for the 'user_profile_utils.py' module."
-  ]
-}
-```"""
+from pipeline.test_runner import (
+    extract_dependencies,
+    install_dependencies,
+    run_tests,
+)
+from pipeline.agents import (
+    IdentificationAgent,
+    ImplementationAgent,
+    EvaluationAgent,
+)
 
 
 # ==================== Pipeline Implementation ====================
@@ -342,6 +57,15 @@ class PythonTestingPipeline:
         self.llm_client = create_llm_client(use_mock_on_failure=True)
         self.prompt_history = []  # Track all prompts for later analysis
 
+        # Initialize agents
+        self.identification_agent = IdentificationAgent(
+            self.llm_client, self.prompt_history
+        )
+        self.implementation_agent = ImplementationAgent(
+            self.llm_client, self.prompt_history
+        )
+        self.evaluation_agent = EvaluationAgent(self.llm_client, self.prompt_history)
+
         # Print current configuration
         if self.llm_client.current_api_key:
             print(f"Using model: {self.llm_client.current_model}")
@@ -350,31 +74,6 @@ class PythonTestingPipeline:
     def model(self) -> str:
         """Get current model from LLM client."""
         return self.llm_client.current_model
-
-    def _call_llm(
-        self, system_prompt: str, user_prompt: str, agent_name: str = "unknown"
-    ) -> str:
-        """Calls the LLM with the given prompts and records them."""
-        import time as time_module
-
-        timestamp = time_module.strftime("%Y-%m-%d %H:%M:%S")
-
-        # Make the LLM call with automatic fallback
-        response, is_mock = self.llm_client.call(system_prompt, user_prompt)
-
-        # Record the prompt after the call
-        prompt_record = {
-            "timestamp": timestamp,
-            "agent": agent_name,
-            "model": self.llm_client.current_model,
-            "system_prompt": system_prompt,
-            "user_prompt": user_prompt,
-            "response": response,
-            "is_mock": is_mock,
-        }
-        self.prompt_history.append(prompt_record)
-
-        return response
 
     def save_prompts(self, output_dir: Path, run_id: str = None) -> Path:
         """Saves all prompts from this run to a JSON file."""
@@ -400,434 +99,9 @@ class PythonTestingPipeline:
         print(f"   Prompts saved: {prompts_file}")
         return prompts_file
 
-    def _sanitize_code(self, code: str) -> str:
-        """Removes markdown formatting and ensures valid Python code."""
-        # Remove markdown code fences
-        code = code.strip()
-
-        # Handle ```python ... ``` blocks
-        if code.startswith("```"):
-            # Find the end of the first line (language specifier)
-            first_newline = code.find("\n")
-            if first_newline != -1:
-                code = code[first_newline + 1 :]
-
-        # Remove trailing ``` if present
-        if code.endswith("```"):
-            code = code[:-3].rstrip()
-
-        # Also try regex extraction as fallback
-        if "```" in code:
-            match = re.search(r"```(?:python)?\s*([\s\S]*?)```", code)
-            if match:
-                code = match.group(1).strip()
-
-        # Remove any remaining backticks at start/end
-        code = code.strip("`").strip()
-
-        return code
-
-    def _validate_syntax(self, code: str) -> tuple[bool, str, Optional[dict]]:
-        """
-        Validates Python syntax.
-
-        Returns:
-            tuple: (is_valid, error_message, error_details)
-            error_details is a dict with keys: lineno, offset, text, msg
-        """
-        try:
-            import ast
-
-            ast.parse(code)
-            return True, "", None
-        except SyntaxError as e:
-            error_details = {
-                "lineno": e.lineno or 0,
-                "offset": e.offset or 0,
-                "text": e.text or "",
-                "msg": e.msg or "Unknown syntax error",
-            }
-            error_msg = f"Line {e.lineno}: {e.msg}"
-            if e.offset:
-                error_msg += f" (column {e.offset})"
-            return False, error_msg, error_details
-
-    def _fix_syntax_errors(
-        self, code: str, error_msg: str, codebase_path: Path, error_details: dict = None
-    ) -> str:
-        """
-        Asks LLM to fix syntax errors in generated code with enhanced context.
-
-        Args:
-            code: The code with syntax errors
-            error_msg: The error message
-            codebase_path: Path to the codebase being tested
-            error_details: Optional dict with detailed error information
-        """
-        print(f"   ⚠️ Syntax error detected: {error_msg}")
-        print("   🔧 Attempting to fix...")
-
-        # Extract context window around the error
-        code_lines = code.splitlines()
-        context_window = ""
-
-        if error_details and error_details.get("lineno"):
-            error_line = error_details["lineno"]
-            error_col = error_details.get("offset", 0)
-
-            # Show ±5 lines around the error
-            start_line = max(1, error_line - 5)
-            end_line = min(len(code_lines), error_line + 5)
-
-            context_lines = []
-            for i in range(start_line, end_line + 1):
-                line_num = i
-                line_content = code_lines[i - 1] if i <= len(code_lines) else ""
-
-                # Mark the error line with >>>
-                if i == error_line:
-                    marker = ">>> "
-                    # Add column marker if available
-                    if error_col > 0:
-                        context_lines.append(f"{marker}{line_num:3d}: {line_content}")
-                        context_lines.append(
-                            f"         {' ' * (error_col - 1)}^ ERROR HERE"
-                        )
-                    else:
-                        context_lines.append(
-                            f"{marker}{line_num:3d}: {line_content}  # <-- ERROR HERE"
-                        )
-                else:
-                    context_lines.append(f"    {line_num:3d}: {line_content}")
-
-            context_window = "\n".join(context_lines)
-        else:
-            # Fallback: show first 20 lines with line numbers
-            context_lines = [
-                f"    {i + 1:3d}: {line}" for i, line in enumerate(code_lines[:20])
-            ]
-            context_window = "\n".join(context_lines)
-            if len(code_lines) > 20:
-                context_window += f"\n    ... ({len(code_lines) - 20} more lines)"
-
-        # Use chunked reading for source context
-        python_files = self.gather_python_files(codebase_path)
-        source_chunks = self.read_file_contents_chunked(python_files)
-        source_context = "\n\n".join(source_chunks[:2])  # First 2 chunks
-
-        fix_prompt = f"""SYNTAX ERROR DETECTED IN GENERATED TEST CODE
-
-ERROR DETAILS:
-  Type: SyntaxError
-  Message: {error_msg}
-  {f"Line: {error_details['lineno']}, Column: {error_details['offset']}" if error_details else ""}
-
-PROBLEMATIC CODE SECTION:
-{context_window}
-
-FULL GENERATED CODE:
-{code}
-
-SOURCE CODE BEING TESTED (for reference):
-{source_context[:1500]}
-
-INSTRUCTIONS:
-Your task is to fix the syntax error in the test code above.
-1. Identify the exact syntax issue based on the error location and message
-2. Fix ONLY the syntax error (maintain all test logic)
-3. Return ONLY valid Python code with NO markdown formatting
-4. Do NOT include code fences (``` or ```python)
-5. Return the complete, corrected test file
-
-Return the fixed code now:"""
-
-        response = self._call_llm(
-            IMPLEMENTATION_SYSTEM_PROMPT, fix_prompt, agent_name="syntax_fixer"
-        )
-        return self._sanitize_code(response)
-
-    def gather_python_files(self, codebase_path: Path) -> list[Path]:
-        """Gathers all Python files from the codebase."""
-        python_files = []
-        excluded_dirs = {
-            ".git",
-            "__pycache__",
-            "venv",
-            ".venv",
-            "node_modules",
-            ".pytest_cache",
-            "tests",
-            "test",
-            "__tests__",
-        }
-
-        for root, dirs, files in os.walk(codebase_path):
-            # Filter out excluded directories (test directories, hidden dirs, etc.)
-            dirs[:] = [
-                d for d in dirs if d not in excluded_dirs and not d.startswith(".")
-            ]
-
-            for file in files:
-                # Exclude test files: test_*.py, *_test.py, conftest.py
-                if file.endswith(".py"):
-                    is_test_file = (
-                        file.startswith("test_")
-                        or file.endswith("_test.py")
-                        or file == "conftest.py"
-                    )
-                    if not is_test_file:
-                        python_files.append(Path(root) / file)
-
-        return python_files
-
-    def read_file_contents(self, files: list[Path]) -> str:
-        """Reads and combines content from multiple files."""
-        contents = []
-        for file_path in files:
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    contents.append(f"# File: {file_path}\n{f.read()}")
-            except Exception as e:
-                print(f"Warning: Could not read {file_path}: {e}")
-        return "\n\n".join(contents)
-
-    def read_file_contents_chunked(
-        self, files: list[Path], max_lines_per_chunk: int = 200
-    ) -> list[str]:
-        """
-        Reads files and chunks them by logical boundaries (functions/classes).
-
-        Args:
-            files: List of Python files to read
-            max_lines_per_chunk: Target maximum lines per chunk (default: 200)
-
-        Returns:
-            List of code chunks, each containing logical units under ~max_lines_per_chunk
-        """
-        import ast
-
-        chunks = []
-
-        for file_path in files:
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    file_content = f.read()
-                    file_lines = file_content.splitlines()
-
-                # Try to parse with AST
-                try:
-                    tree = ast.parse(file_content)
-
-                    # Extract top-level definitions with their line ranges
-                    definitions = []
-                    for node in ast.iter_child_nodes(tree):
-                        if isinstance(
-                            node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)
-                        ):
-                            # Get the line range of this definition
-                            start_line = node.lineno - 1  # Convert to 0-indexed
-                            end_line = (
-                                node.end_lineno if node.end_lineno else start_line + 1
-                            )
-
-                            definitions.append(
-                                {
-                                    "type": node.__class__.__name__,
-                                    "name": node.name,
-                                    "start": start_line,
-                                    "end": end_line,
-                                    "lines": end_line - start_line,
-                                }
-                            )
-
-                    # Group definitions into chunks
-                    if definitions:
-                        current_chunk_defs = []
-                        current_chunk_lines = 0
-
-                        for defn in definitions:
-                            # If adding this definition exceeds the limit and we have existing defs
-                            if (
-                                current_chunk_lines + defn["lines"]
-                                > max_lines_per_chunk
-                                and current_chunk_defs
-                            ):
-                                # Flush current chunk
-                                start_idx = current_chunk_defs[0]["start"]
-                                end_idx = current_chunk_defs[-1]["end"]
-                                chunk_content = "\n".join(file_lines[start_idx:end_idx])
-                                chunks.append(f"# File: {file_path}\n{chunk_content}")
-
-                                # Start new chunk with current definition
-                                current_chunk_defs = [defn]
-                                current_chunk_lines = defn["lines"]
-                            else:
-                                # Add to current chunk
-                                current_chunk_defs.append(defn)
-                                current_chunk_lines += defn["lines"]
-
-                        # Flush remaining chunk
-                        if current_chunk_defs:
-                            start_idx = current_chunk_defs[0]["start"]
-                            end_idx = current_chunk_defs[-1]["end"]
-                            chunk_content = "\n".join(file_lines[start_idx:end_idx])
-                            chunks.append(f"# File: {file_path}\n{chunk_content}")
-                    else:
-                        # No definitions found, chunk by line count
-                        for i in range(0, len(file_lines), max_lines_per_chunk):
-                            chunk_lines = file_lines[i : i + max_lines_per_chunk]
-                            chunks.append(
-                                f"# File: {file_path} (lines {i + 1}-{i + len(chunk_lines)})\n"
-                                + "\n".join(chunk_lines)
-                            )
-
-                except SyntaxError:
-                    # If AST parsing fails, fall back to simple line-based chunking
-                    print(
-                        f"   ⚠️  Could not parse {file_path.name}, using line-based chunking"
-                    )
-                    for i in range(0, len(file_lines), max_lines_per_chunk):
-                        chunk_lines = file_lines[i : i + max_lines_per_chunk]
-                        chunks.append(
-                            f"# File: {file_path} (lines {i + 1}-{i + len(chunk_lines)})\n"
-                            + "\n".join(chunk_lines)
-                        )
-
-            except Exception as e:
-                print(f"   Warning: Could not read {file_path}: {e}")
-
-        return chunks
-
-    def _process_chunk_for_scenarios(
-        self, chunk_idx: int, code_chunk: str, file_list: str, total_chunks: int
-    ) -> list[TestScenario]:
-        """
-        Process a single code chunk to identify test scenarios.
-        This method is designed to be called in parallel.
-
-        Args:
-            chunk_idx: Index of the chunk (1-indexed for display)
-            code_chunk: The code content to analyze
-            file_list: List of all files in the project
-            total_chunks: Total number of chunks
-
-        Returns:
-            List of TestScenario objects identified from this chunk
-        """
-        # Create a dedicated LLM client for this thread/worker
-        # Each worker gets its own client with independent API key rotation
-        llm_client = create_llm_client(use_mock_on_failure=True)
-
-        print(f"   Processing chunk {chunk_idx}/{total_chunks}...")
-
-        user_prompt = f"""Analyze this Python codebase chunk and identify test scenarios.
-
-Files in project: {file_list}
-
-Code chunk {chunk_idx} of {total_chunks}:
-{code_chunk}
-
-Respond with JSON containing test_scenarios."""
-
-        response, is_mock = llm_client.call(IDENTIFICATION_SYSTEM_PROMPT, user_prompt)
-
-        # Record this prompt in history (same as _call_llm does)
-        import time as time_module
-
-        timestamp = time_module.strftime("%Y-%m-%d %H:%M:%S")
-        prompt_record = {
-            "timestamp": timestamp,
-            "agent": "identification_agent",
-            "model": llm_client.current_model,
-            "system_prompt": IDENTIFICATION_SYSTEM_PROMPT,
-            "user_prompt": user_prompt,
-            "response": response,
-            "is_mock": is_mock,
-        }
-        self.prompt_history.append(prompt_record)
-
-        try:
-            if "```" in response:
-                json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
-                if json_match:
-                    response = json_match.group(1).strip()
-
-            data = json.loads(response)
-            chunk_scenarios = [TestScenario(**s) for s in data["test_scenarios"]]
-            return chunk_scenarios
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"   ⚠️  Warning: Failed to parse response for chunk {chunk_idx}: {e}")
-            return []
-
     def identify_test_scenarios(self, codebase_path: Path) -> TestScenariosOutput:
         """Agent 1: Identifies test scenarios from the codebase using parallel processing."""
-        print("\n🔍 Agent 1: Identifying test scenarios...")
-
-        python_files = self.gather_python_files(codebase_path)
-        if not python_files:
-            raise ValueError(f"No Python files found in {codebase_path}")
-
-        print(f"   Found {len(python_files)} Python files to analyze")
-
-        # Use chunked reading
-        code_chunks = self.read_file_contents_chunked(python_files)
-        print(f"   Split into {len(code_chunks)} logical chunks")
-
-        file_list = "\n".join(str(f) for f in python_files)
-        all_scenarios = []
-
-        # Process chunks in parallel using ThreadPoolExecutor
-        # Limit workers to avoid overwhelming the API and to match available API keys
-        max_workers = min(5, len(code_chunks))
-
-        if len(code_chunks) > 1:
-            print(f"   Using {max_workers} parallel workers for faster processing")
-
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all chunks for processing
-                future_to_chunk = {
-                    executor.submit(
-                        self._process_chunk_for_scenarios,
-                        idx + 1,
-                        chunk,
-                        file_list,
-                        len(code_chunks),
-                    ): idx + 1
-                    for idx, chunk in enumerate(code_chunks)
-                }
-
-                # Collect results as they complete
-                for future in as_completed(future_to_chunk):
-                    chunk_idx = future_to_chunk[future]
-                    try:
-                        scenarios = future.result()
-                        all_scenarios.extend(scenarios)
-                    except Exception as e:
-                        print(f"   ⚠️  Error processing chunk {chunk_idx}: {e}")
-        else:
-            # Single chunk - no need for parallelization
-            scenarios = self._process_chunk_for_scenarios(
-                1, code_chunks[0], file_list, 1
-            )
-            all_scenarios.extend(scenarios)
-
-        # Deduplicate scenarios based on description similarity
-        unique_scenarios = []
-        seen_descriptions = set()
-
-        for scenario in all_scenarios:
-            # Normalize description for comparison
-            normalized = scenario.scenario_description.lower().strip()
-            if normalized not in seen_descriptions:
-                seen_descriptions.add(normalized)
-                unique_scenarios.append(scenario)
-
-        print(
-            f"   Identified {len(all_scenarios)} scenarios ({len(unique_scenarios)} unique)"
-        )
-        return TestScenariosOutput(test_scenarios=unique_scenarios)
+        return self.identification_agent.run(codebase_path)
 
     def request_approval(self, scenarios: TestScenariosOutput) -> TestScenariosOutput:
         """
@@ -871,300 +145,7 @@ Respond with JSON containing test_scenarios."""
         self, scenarios: TestScenariosOutput, codebase_path: Path, output_dir: Path
     ) -> tuple[str, Path]:
         """Agent 2: Generates PyTest test code from approved scenarios."""
-        print("\n🔧 Agent 2: Generating PyTest test code...")
-
-        python_files = self.gather_python_files(codebase_path)
-
-        # Use chunked reading and limit to reasonable amount
-        code_chunks = self.read_file_contents_chunked(python_files)
-        # Take first 5 chunks (~1000 lines) to provide enough context without exceeding tokens
-        max_chunks = 5
-        selected_chunks = code_chunks[:max_chunks]
-        code_context = "\n\n".join(selected_chunks)
-
-        chunk_info = (
-            f"{len(selected_chunks)} of {len(code_chunks)} code chunks"
-            if len(code_chunks) > max_chunks
-            else f"{len(code_chunks)} code chunks"
-        )
-        print(f"   Using {chunk_info} for context")
-
-        scenarios_json = json.dumps(asdict(scenarios), indent=2)
-
-        # Build file list for the AI to understand the project structure
-        file_list = "\n".join(f"  - {f.name}" for f in python_files)
-
-        user_prompt = f"""Generate PyTest tests for these scenarios:
-
-{scenarios_json}
-
-PROJECT STRUCTURE:
-- Tests will be saved to: tests/test_generated_*.py
-- Source files are in the project root:
-{file_list}
-
-CRITICAL: CODE COVERAGE - IMPORT SOURCE FILES DIRECTLY:
-- Add project root to sys.path: `sys.path.insert(0, str(PROJECT_ROOT))`
-- Import source modules directly: `import server` (NOT as subprocess)
-- Test functions, classes, and constants directly to measure coverage
-- DO NOT run source files as subprocesses - coverage won't be measured!
-
-WINDOWS COMPATIBILITY:
-- NEVER use `signal.SIGINT` to stop processes (not supported on Windows)
-- Use `proc.terminate()` or `proc.kill()` to stop subprocesses
-- For keyboard interrupt tests, mock the behavior instead of sending real signals
-
-Source code (showing {chunk_info}):
-{code_context}
-
-IMPORTANT RULES:
-1. Return ONLY valid Python code - no markdown, no code fences
-2. Include all necessary imports at the top
-3. Each test function must start with 'test_'
-4. IMPORT source modules directly for coverage (add project root to sys.path first)
-5. Use mocking for side effects (network, file I/O)
-6. Use proc.terminate() instead of signal.SIGINT for stopping processes
-
-Generate a complete, executable PyTest file."""
-
-        response = self._call_llm(
-            IMPLEMENTATION_SYSTEM_PROMPT, user_prompt, agent_name="implementation_agent"
-        )
-        test_code = self._sanitize_code(response)
-
-        # Validate syntax and fix if needed (up to 3 attempts)
-        for attempt in range(3):
-            is_valid, error_msg, error_details = self._validate_syntax(test_code)
-            if is_valid:
-                break
-            test_code = self._fix_syntax_errors(
-                test_code, error_msg, codebase_path, error_details
-            )
-
-        # Final validation
-        is_valid, error_msg, error_details = self._validate_syntax(test_code)
-        if not is_valid:
-            print(f"   ⚠️ Warning: Generated code may have syntax errors: {error_msg}")
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-        test_file = output_dir / f"test_generated_{int(__import__('time').time())}.py"
-
-        with open(test_file, "w", encoding="utf-8") as f:
-            f.write(test_code)
-
-        print(f"   Generated: {test_file}")
-        return test_code, test_file
-
-    def extract_dependencies(self, test_code: str) -> list[str]:
-        """Extracts required packages from generated test code imports."""
-        # Common import to package name mappings
-        import_to_package = {
-            "fastapi": "fastapi",
-            "starlette": "starlette",
-            "httpx": "httpx",
-            "pytest": "pytest",
-            "pytest_asyncio": "pytest-asyncio",
-            "jinja2": "jinja2",
-            "pydantic": "pydantic",
-            "sqlalchemy": "sqlalchemy",
-            "flask": "flask",
-            "django": "django",
-            "requests": "requests",
-            "aiohttp": "aiohttp",
-            "numpy": "numpy",
-            "pandas": "pandas",
-        }
-
-        # Find all imports
-        import_pattern = r"^(?:from|import)\s+([a-zA-Z_][a-zA-Z0-9_]*)"
-        imports = set()
-        for line in test_code.split("\n"):
-            match = re.match(import_pattern, line.strip())
-            if match:
-                module = match.group(1)
-                if module in import_to_package:
-                    imports.add(import_to_package[module])
-
-        # Always include pytest essentials
-        imports.add("pytest")
-        imports.add("pytest-cov")
-        imports.add("pytest-timeout")
-
-        return list(imports)
-
-    def install_dependencies(self, packages: list[str], cwd: Path) -> tuple[str, int]:
-        """Installs required packages using pip, skipping those already installed."""
-        if not packages:
-            return "No packages to install", 0
-
-        # Check which packages are already installed
-        missing_packages = []
-        # Get all installed packages, normalized to lowercase and hyphens
-        installed_dists = set()
-        for d in importlib.metadata.distributions():
-            name = d.metadata.get("Name")
-            if name:
-                installed_dists.add(name.lower().replace("_", "-"))
-
-        for package in packages:
-            # Extract package name from version specifiers (e.g., "pytest>=7.0" -> "pytest")
-            # Simple normalization for comparison
-            pkg_name = (
-                package.split("==")[0]
-                .split(">=")[0]
-                .split("<=")[0]
-                .split(">")[0]
-                .split("<")[0]
-                .strip()
-                .lower()
-                .replace("_", "-")
-            )
-
-            if pkg_name not in installed_dists:
-                missing_packages.append(package)
-
-        if not missing_packages:
-            print(f"\n✅ All dependencies already installed: {', '.join(packages)}")
-            return "All dependencies already installed", 0
-
-        print(f"\n📦 Installing dependencies: {', '.join(missing_packages)}")
-
-        cmd = [sys.executable, "-m", "pip", "install", "--quiet"] + missing_packages
-
-        try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=120, cwd=cwd
-            )
-            output = result.stdout + "\n" + result.stderr
-            if result.returncode == 0:
-                print("   ✅ Dependencies installed successfully")
-            else:
-                print(f"   ⚠️ Some packages may have failed: {result.stderr}")
-            return output, result.returncode
-        except subprocess.TimeoutExpired:
-            return "Dependency installation timed out", 1
-        except Exception as e:
-            return f"Error installing dependencies: {e}", 1
-
-    def run_tests(self, test_file: Path, codebase_path: Path) -> dict:
-        """Runs the generated PyTest suite with coverage measurement."""
-        print("\n🧪 Running tests with coverage...")
-
-        # Get source directory to measure coverage
-        source_dir = str(codebase_path)
-
-        # Create a .coveragerc file to exclude test files from coverage measurement.
-        # This prevents the AI from trying to generate tests for test files.
-        coveragerc_path = codebase_path / ".coveragerc"
-        coveragerc_content = """[run]
-omit =
-    */tests/*
-    */test/*
-    **/test_*.py
-    **/*_test.py
-    **/conftest.py
-
-[report]
-omit =
-    */tests/*
-    */test/*
-    **/test_*.py
-    **/*_test.py
-    **/conftest.py
-"""
-        try:
-            with open(coveragerc_path, "w", encoding="utf-8") as f:
-                f.write(coveragerc_content)
-        except Exception as e:
-            print(f"   ⚠️ Could not create .coveragerc: {e}")
-
-        cmd = [
-            sys.executable,
-            "-m",
-            "pytest",
-            str(test_file),
-            "-v",
-            "--tb=short",
-            "--timeout=30",  # Per-test timeout of 30 seconds
-            f"--cov={source_dir}",
-            "--cov-report=term-missing",
-            "--cov-report=json",
-        ]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=120,  # 2-minute overall timeout
-                cwd=test_file.parent.parent,
-            )
-            output = result.stdout + "\n" + result.stderr
-            print(output)
-
-            # Parse test results from output
-            test_results = self._parse_pytest_output(output)
-
-            # Parse coverage from JSON report
-            coverage_json_path = test_file.parent.parent / "coverage.json"
-            coverage_pct = self._parse_coverage_json(coverage_json_path)
-
-            return {
-                "output": output,
-                "exit_code": result.returncode,
-                "total_tests": test_results["total"],
-                "passed": test_results["passed"],
-                "failed": test_results["failed"],
-                "coverage_percentage": coverage_pct,
-            }
-        except subprocess.TimeoutExpired:
-            return {
-                "output": "Test execution timed out",
-                "exit_code": 1,
-                "total_tests": 0,
-                "passed": 0,
-                "failed": 0,
-                "coverage_percentage": 0.0,
-            }
-        except Exception as e:
-            return {
-                "output": f"Error running tests: {e}",
-                "exit_code": 1,
-                "total_tests": 0,
-                "passed": 0,
-                "failed": 0,
-                "coverage_percentage": 0.0,
-            }
-
-    def _parse_pytest_output(self, output: str) -> dict:
-        """Parses pytest output to extract test counts."""
-        total = passed = failed = 0
-
-        # Match patterns like "5 passed", "3 failed", "10 passed, 2 failed"
-        passed_match = re.search(r"(\d+) passed", output)
-        failed_match = re.search(r"(\d+) failed", output)
-        error_match = re.search(r"(\d+) error", output)
-
-        if passed_match:
-            passed = int(passed_match.group(1))
-        if failed_match:
-            failed = int(failed_match.group(1))
-        if error_match:
-            failed += int(error_match.group(1))
-
-        total = passed + failed
-        return {"total": total, "passed": passed, "failed": failed}
-
-    def _parse_coverage_json(self, coverage_json_path: Path) -> float:
-        """Parses coverage.json to extract total coverage percentage."""
-        try:
-            if coverage_json_path.exists():
-                with open(coverage_json_path, "r") as f:
-                    data = json.load(f)
-                    return data.get("totals", {}).get("percent_covered", 0.0)
-        except Exception as e:
-            print(f"   ⚠️ Could not parse coverage.json: {e}")
-        return 0.0
+        return self.implementation_agent.run(scenarios, codebase_path, output_dir)
 
     def _extract_uncovered_areas(self, test_output: str) -> str:
         """Extracts uncovered lines/areas from pytest-cov output."""
@@ -1200,104 +181,7 @@ omit =
         self, test_results: dict, scenarios: TestScenariosOutput, codebase_path: Path
     ) -> TestEvaluationOutput:
         """Agent 3: Evaluates test results, coverage, and security."""
-        print("\n📊 Agent 3: Evaluating test results and security...")
-
-        # Use actual measured values
-        actual_coverage = test_results.get("coverage_percentage", 0.0)
-        total_tests = test_results.get("total_tests", 0)
-        passed = test_results.get("passed", 0)
-        failed = test_results.get("failed", 0)
-
-        print(f"   Actual coverage measured: {actual_coverage:.1f}%")
-
-        # Gather source code for security analysis
-        python_files = self.gather_python_files(codebase_path)
-        source_code = self.read_file_contents(python_files[:10])
-
-        scenarios_json = json.dumps(asdict(scenarios), indent=2)
-        user_prompt = f"""Evaluate these PyTest results AND perform security analysis:
-
-Scenarios: {scenarios_json}
-
-Test Results:
-- Total tests: {total_tests}
-- Passed: {passed}
-- Failed: {failed}
-- Code Coverage: {actual_coverage:.1f}%
-
-PyTest Output:
-{test_results.get("output", "")[:3000]}
-
-Source Code (analyze for security issues):
-{source_code[:5000]}
-
-Provide:
-1. Actionable recommendations to improve test coverage and fix failures
-2. Security analysis identifying vulnerabilities (SQL injection, XSS, command injection, path traversal, hardcoded secrets, etc.)
-3. Mark has_severe_security_issues as true if any critical or high severity issues exist
-
-Respond with JSON containing execution_summary, code_coverage_percentage, security_issues, has_severe_security_issues, and actionable_recommendations."""
-
-        response = self._call_llm(
-            EVALUATION_SYSTEM_PROMPT, user_prompt, agent_name="evaluation_agent"
-        )
-
-        try:
-            if "```" in response:
-                json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
-                if json_match:
-                    response = json_match.group(1).strip()
-
-            data = json.loads(response)
-
-            # Parse security issues
-            security_issues = []
-            for issue_data in data.get("security_issues", []):
-                security_issues.append(
-                    SecurityIssue(
-                        severity=issue_data.get("severity", "low"),
-                        issue=issue_data.get("issue", ""),
-                        location=issue_data.get("location", ""),
-                        recommendation=issue_data.get("recommendation", ""),
-                    )
-                )
-
-            has_severe = data.get("has_severe_security_issues", False)
-            # Also check if any security issues are critical/high
-            if not has_severe and security_issues:
-                has_severe = any(
-                    si.severity in ("critical", "high") for si in security_issues
-                )
-
-            if security_issues:
-                print(f"   🔒 Security issues found: {len(security_issues)}")
-                severe_count = sum(
-                    1 for si in security_issues if si.severity in ("critical", "high")
-                )
-                if severe_count > 0:
-                    print(f"   ⚠️  Severe issues (critical/high): {severe_count}")
-
-            # Override with actual measured values
-            return TestEvaluationOutput(
-                execution_summary=ExecutionSummary(
-                    total_tests=total_tests, passed=passed, failed=failed
-                ),
-                code_coverage_percentage=actual_coverage,
-                actionable_recommendations=data.get("actionable_recommendations", []),
-                security_issues=security_issues,
-                has_severe_security_issues=has_severe,
-            )
-        except (json.JSONDecodeError, KeyError) as e:
-            # Return actual values even if LLM parsing fails
-            return TestEvaluationOutput(
-                execution_summary=ExecutionSummary(
-                    total_tests=total_tests, passed=passed, failed=failed
-                ),
-                code_coverage_percentage=actual_coverage,
-                actionable_recommendations=[f"Evaluation parsing failed: {e}"],
-                security_issues=[],
-                has_severe_security_issues=False,
-            )
+        return self.evaluation_agent.run(test_results, scenarios, codebase_path)
 
     def generate_additional_tests(
         self,
@@ -1309,144 +193,20 @@ Respond with JSON containing execution_summary, code_coverage_percentage, securi
         security_issues: list = None,
     ) -> tuple[str, Path]:
         """Generates additional tests to improve coverage and address security issues."""
-        reasons = []
-        if coverage_percentage < 90.0:
-            reasons.append(f"coverage ({coverage_percentage:.1f}%) below 90%")
-        if security_issues:
-            severe = [
-                si for si in security_issues if si.severity in ("critical", "high")
-            ]
-            if severe:
-                reasons.append(f"{len(severe)} severe security issue(s)")
-
-        print(f"\n🔄 Generating additional tests: {', '.join(reasons)}...")
-
-        python_files = self.gather_python_files(codebase_path)
-        code_context = self.read_file_contents(python_files[:10])
-
-        # Build file list for the AI to understand the project structure
-        file_list = "\n".join(f"  - {f.name}" for f in python_files)
-
-        # Read existing tests
-        existing_tests = ""
-        try:
-            with open(existing_test_file, "r", encoding="utf-8") as f:
-                existing_tests = f.read()
-        except Exception:
-            pass
-
-        # Build error context if there were syntax errors
-        error_context = ""
-        if syntax_errors:
-            error_context = f"""\n\nCRITICAL: The previous test file had syntax errors that must be fixed:
-{syntax_errors}
-
-Common issues to avoid:
-- Do NOT include markdown code fences (``` or ```python)
-- Ensure all strings are properly closed
-- Ensure all parentheses, brackets, and braces are balanced
-- Make sure indentation is consistent (use 4 spaces)
-"""
-
-        # Build security context if there are security issues
-        security_context = ""
-        if security_issues:
-            security_feedback = []
-            for si in security_issues:
-                security_feedback.append(
-                    f"- [{si.severity.upper()}] {si.issue} at {si.location}\n"
-                    f"  Recommendation: {si.recommendation}"
-                )
-            security_context = f"""\n\nSECURITY ISSUES TO ADDRESS:
-The following security vulnerabilities were identified. Add tests that:
-1. Verify these vulnerabilities are handled properly
-2. Test boundary conditions and malicious inputs
-3. Ensure proper input validation and sanitization
-
-{chr(10).join(security_feedback)}
-
-For each security issue, add at least one test that:
-- Tests the vulnerable code path with malicious input
-- Verifies proper error handling or input rejection
-- Checks that sensitive data is not exposed in errors
-"""
-
-        user_prompt = f"""The current test suite needs improvements:
-- Code coverage: {coverage_percentage:.1f}% (target: 90%+)
-- Security issues: {len(security_issues) if security_issues else 0} found
-
-PROJECT STRUCTURE:
-- Tests are saved in: tests/test_generated_*.py
-- Source files are in the project root:
-{file_list}
-
-CRITICAL: CODE COVERAGE - IMPORT SOURCE FILES DIRECTLY:
-- Add project root to sys.path: `sys.path.insert(0, str(PROJECT_ROOT))`
-- Import source modules directly: `import server` (NOT as subprocess)
-- Test functions, classes, and constants directly to measure coverage
-- DO NOT run source files as subprocesses - coverage won't be measured!
-
-WINDOWS COMPATIBILITY:
-- NEVER use `signal.SIGINT` to stop processes (not supported on Windows)
-- Use `proc.terminate()` or `proc.kill()` to stop subprocesses
-- For keyboard interrupt tests, mock the behavior instead of sending real signals
-{error_context}{security_context}
-Existing tests (may have errors - fix them):
-{existing_tests[:3000]}
-
-Uncovered code areas from coverage report:
-{uncovered_areas}
-
-Source code to test:
-{code_context}
-
-IMPORTANT RULES:
-1. Return ONLY valid Python code - NO markdown code fences (``` or ```python)
-2. Fix any syntax errors from the existing tests
-3. IMPORT source modules directly for coverage (add project root to sys.path first)
-4. Each test function must start with 'test_'
-5. Use mocking for side effects (network, file I/O)
-6. Use proc.terminate() instead of signal.SIGINT for stopping processes
-
-Generate a complete, executable PyTest file that:
-1. Fixes any existing syntax errors
-2. IMPORTS source modules directly (not subprocess) for coverage
-3. Tests uncovered lines by calling functions/classes directly
-4. Aims for 90%+ code coverage"""
-
-        response = self._call_llm(
-            IMPLEMENTATION_SYSTEM_PROMPT,
-            user_prompt,
-            agent_name="implementation_agent_improvement",
+        return self.implementation_agent.improve_tests(
+            codebase_path,
+            existing_test_file,
+            coverage_percentage,
+            uncovered_areas,
+            syntax_errors,
+            security_issues,
         )
-        test_code = self._sanitize_code(response)
-
-        # Validate syntax and fix if needed
-        for attempt in range(3):
-            is_valid, error_msg, error_details = self._validate_syntax(test_code)
-            if is_valid:
-                break
-            test_code = self._fix_syntax_errors(
-                test_code, error_msg, codebase_path, error_details
-            )
-
-        # Final validation
-        is_valid, error_msg, error_details = self._validate_syntax(test_code)
-        if not is_valid:
-            print(f"   ⚠️ Warning: Code may still have syntax errors: {error_msg}")
-
-        # Overwrite existing test file with improved version
-        with open(existing_test_file, "w", encoding="utf-8") as f:
-            f.write(test_code)
-
-        print(f"   Updated: {existing_test_file}")
-        return test_code, existing_test_file
 
     def run_pipeline(
         self,
         codebase_path: Path,
         output_dir: Optional[Path] = None,
-        run_tests: bool = True,
+        should_run_tests: bool = True,
         coverage: bool = False,
         auto_approve: bool = False,
     ) -> dict:
@@ -1480,17 +240,15 @@ Generate a complete, executable PyTest file that:
             results["test_code"] = test_code
 
             # Step 4: Install dependencies
-            if run_tests:
-                deps = self.extract_dependencies(test_code)
+            if should_run_tests:
+                deps = extract_dependencies(test_code)
                 if deps:
-                    dep_output, dep_exit = self.install_dependencies(
-                        deps, codebase_path
-                    )
+                    dep_output, dep_exit = install_dependencies(deps, codebase_path)
                     results["dependencies_installed"] = deps
                     results["dependency_output"] = dep_output
 
             # Step 5: Run tests with coverage and improvement loop
-            if run_tests:
+            if should_run_tests:
                 target_coverage = 90.0
                 max_iterations = 15  # Safety limit to prevent infinite loops
                 current_test_file = test_file
@@ -1507,7 +265,7 @@ Generate a complete, executable PyTest file that:
                     print(f"\n--- Iteration {iteration} ---")
 
                     # Run tests with coverage
-                    test_results = self.run_tests(current_test_file, codebase_path)
+                    test_results = run_tests(current_test_file, codebase_path)
                     results["test_output"] = test_results["output"]
                     results["exit_code"] = test_results["exit_code"]
 
@@ -1620,9 +378,9 @@ Generate a complete, executable PyTest file that:
                     )
 
                     # Re-extract and install any new dependencies
-                    new_deps = self.extract_dependencies(current_test_code)
+                    new_deps = extract_dependencies(current_test_code)
                     if new_deps:
-                        self.install_dependencies(new_deps, codebase_path)
+                        install_dependencies(new_deps, codebase_path)
 
                 else:
                     # Reached max iterations without meeting targets
@@ -1674,17 +432,18 @@ Generate a complete, executable PyTest file that:
                 prompts_file = self.save_prompts(
                     output_dir or codebase_path / "tests", run_id
                 )
-                results["prompts_file"] = str(prompts_file)
-            except Exception:
-                pass
+                print(f"   Prompts saved to: {prompts_file}")
+            except Exception as save_error:
+                print(f"   Could not save prompts: {save_error}")
 
         return results
 
 
-# ==================== CLI Entry Point ====================
+# ==================== Main Entry Point ====================
 
 
 def main():
+    """Main entry point for the pipeline."""
     parser = argparse.ArgumentParser(description="Python Automated Testing Pipeline")
     parser.add_argument("codebase_path", type=Path, help="Path to Python codebase")
     # The pipeline will run generated tests by default. Use --no-run-tests to disable.
@@ -1725,7 +484,7 @@ def main():
     results = pipeline.run_pipeline(
         codebase_path=args.codebase_path,
         output_dir=args.output_dir,
-        run_tests=run_tests_flag,
+        should_run_tests=run_tests_flag,
         coverage=args.coverage,
         auto_approve=args.auto_approve,
     )
