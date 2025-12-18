@@ -1,0 +1,29 @@
+[
+  {
+    "id": "20251204205904438286",
+    "amount": 234.0,
+    "category": "Transport",
+    "description": "",
+    "date": "2025-12-04",
+    "payment_method": "Other",
+    "is_income": true
+  },
+  {
+    "id": "20251204205902504622",
+    "amount": 234.0,
+    "category": "Transport",
+    "description": "",
+    "date": "2025-12-04",
+    "payment_method": "Other",
+    "is_income": true
+  },
+  {
+    "id": "20251204205858528565",
+    "amount": 324.0,
+    "category": "Transport",
+    "description": "",
+    "date": "2025-12-04",
+    "payment_method": "Other",
+    "is_income": false
+  }
+]
