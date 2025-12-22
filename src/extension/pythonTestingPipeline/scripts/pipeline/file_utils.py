@@ -54,7 +54,7 @@ def read_file_contents(files: List[Path]) -> str:
 
 
 def read_file_contents_chunked(
-    files: List[Path], max_lines_per_chunk: int = 200
+    files: List[Path], max_lines_per_chunk: int = 100
 ) -> List[str]:
     """
     Reads files and chunks them by logical boundaries (functions/classes).

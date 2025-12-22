@@ -1,288 +1,189 @@
 #!/usr/bin/env python3
-"""
-LLM Configuration and Fallback Logic
+"""LLM client for Groq API with shared rate limiting."""
 
-This module handles API key rotation and model fallback for the Python Testing Pipeline.
-Add new API keys to the .env file as GROQ_API_KEY_1, GROQ_API_KEY_2, etc.
-"""
-
-import os
-import time
-from dataclasses import dataclass
+import os, time, threading
 from pathlib import Path
-from typing import Optional
 
-# Try to import openai
 try:
-    import openai
+    import groq
 
-    OPENAI_AVAILABLE = True
+    GROQ_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
+    GROQ_AVAILABLE = False
+
+# Load .env
+_env = Path(__file__).parent / ".env"
+if _env.exists():
+    for line in _env.read_text().splitlines():
+        if line.strip() and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+# Model specs: context, max_output, rpm, tpm
+MODEL_SPECS = {
+    "openai/gpt-oss-120b": (131072, 65536, 1000, 250000),
+    "openai/gpt-oss-20b": (131072, 65536, 1000, 250000),
+    "meta-llama/llama-4-maverick-17b-128e-instruct": (131072, 8192, 1000, 250000),
+    "meta-llama/llama-4-scout-17b-16e-instruct": (131072, 8192, 1000, 250000),
+    "moonshotai/kimi-k2-instruct-0905": (262144, 16384, 60, 10000),
+    "moonshotai/kimi-k2-instruct": (131072, 8192, 60, 10000),
+    "groq/compound": (131072, 8192, 200, 200000),
+    "groq/compound-mini": (131072, 8192, 200, 200000),
+}
+MODELS = list(MODEL_SPECS.keys())
 
 
-def load_dotenv():
-    """Load environment variables from .env file."""
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        with open(env_path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    os.environ.setdefault(key.strip(), value.strip())
+class _RateLimiter:
+    """Thread-safe singleton rate limiter."""
+
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if not cls._instance:
+            with cls._lock:
+                if not cls._instance:
+                    inst = super().__new__(cls)
+                    inst._lock = threading.Lock()
+                    inst.history = {m: [] for m in MODELS}
+                    inst.cooldowns = {m: 0.0 for m in MODELS}
+                    cls._instance = inst
+        return cls._instance
+
+    def set_cooldown(self, model: str, seconds: float):
+        with self._lock:
+            self.cooldowns[model] = time.time() + seconds
+
+    def can_request(self, model: str, tokens: int) -> bool:
+        now = time.time()
+        if now < self.cooldowns.get(model, 0):
+            return False
+        spec = MODEL_SPECS.get(model)
+        if not spec:
+            return True
+        ctx, _, rpm, tpm = spec
+        with self._lock:
+            self.history[model] = [
+                (t, c) for t, c in self.history[model] if now - t < 60
+            ]
+            if len(self.history[model]) >= rpm * 0.8:
+                return False
+            if sum(c for _, c in self.history[model]) + tokens >= tpm * 0.8:
+                return False
+        return True
+
+    def record(self, model: str, tokens: int):
+        with self._lock:
+            self.history[model].append((time.time(), tokens))
+
+    def wait_time(self) -> float:
+        now = time.time()
+        waits = []
+        for m in MODELS:
+            cd = self.cooldowns.get(m, 0) - now
+            if cd > 0:
+                waits.append(cd)
+            elif self.history[m]:
+                oldest = min(t for t, _ in self.history[m])
+                waits.append(max(0, 60 - (now - oldest)))
+        return min(waits) if waits else 5.0
 
 
-# Load .env on module import
-load_dotenv()
-
-
-@dataclass
-class LLMConfig:
-    """Configuration for LLM API access."""
-
-    # API endpoint
-    BASE_URL = "https://api.groq.com/openai/v1"
-
-    # Models in order of preference (will try each on failure)
-    MODELS = [
-        "moonshotai/kimi-k2-instruct-0905",
-        "moonshotai/kimi-k2-instruct",
-        "groq/compound",
-        "groq/compound-mini",
-        "openai/gpt-oss-120b",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "openai/gpt-oss-20b",
-    ]
-
-    # API keys loaded from environment (in order of preference)
-    @staticmethod
-    def get_api_keys() -> list[str]:
-        """
-        Get all available API keys from environment.
-        Looks for GROQ_API_KEY, GROQ_API_KEY_1, GROQ_API_KEY_2, etc.
-        """
-        keys = []
-
-        # Check for the main key first
-        main_key = os.environ.get("GROQ_API_KEY")
-        if main_key:
-            keys.append(main_key)
-
-        # Check for numbered keys (GROQ_API_KEY_1, GROQ_API_KEY_2, ...)
-        i = 1
-        while True:
-            key = os.environ.get(f"GROQ_API_KEY_{i}")
-            if key:
-                keys.append(key)
-                i += 1
-            else:
-                break
-
-        return keys
+_rl = _RateLimiter()
 
 
 class LLMClient:
-    """
-    LLM Client with automatic API key rotation and model fallback.
-
-    When a rate limit (429) or other error is encountered:
-    1. Try the next model in the list
-    2. If all models fail, try the next API key
-    3. If all API keys fail, raise an error or return mock response
-    """
-
-    def __init__(self, use_mock_on_failure: bool = True):
-        self.api_keys = LLMConfig.get_api_keys()
-        self.models = LLMConfig.MODELS.copy()
-        self.current_key_index = 0
-        self.current_model_index = 0
-        self.use_mock_on_failure = use_mock_on_failure
-        self._client: Optional[openai.OpenAI] = None
-
+    def __init__(self, **_):
+        self.api_keys = [
+            v for k, v in os.environ.items() if k.startswith("GROQ_API_KEY")
+        ]
         if not self.api_keys:
-            print("⚠️  No API keys found. Add GROQ_API_KEY to .env file.")
+            print("⚠️  No GROQ_API_KEYs found.")
+        self.key_idx = 0
+        self._client = self._make_client()
 
-        self._init_client()
-
-    def _init_client(self):
-        """Initialize or reinitialize the OpenAI client with current API key."""
-        if not OPENAI_AVAILABLE:
-            return
-
-        if self.api_keys and self.current_key_index < len(self.api_keys):
-            # Disable auto-retries to handle them ourselves
-            self._client = openai.OpenAI(
-                api_key=self.api_keys[self.current_key_index],
-                base_url=LLMConfig.BASE_URL,
-                max_retries=0,  # We handle retries ourselves
-                timeout=30.0,
+    def _make_client(self):
+        if GROQ_AVAILABLE and self.api_keys:
+            return groq.Groq(
+                api_key=self.api_keys[self.key_idx % len(self.api_keys)],
+                max_retries=0,
+                timeout=90.0,
             )
-
-    @property
-    def current_model(self) -> str:
-        """Get the current model being used."""
-        return self.models[self.current_model_index]
-
-    @property
-    def current_api_key(self) -> Optional[str]:
-        """Get the current API key (masked for display)."""
-        if self.api_keys and self.current_key_index < len(self.api_keys):
-            key = self.api_keys[self.current_key_index]
-            return f"{key[:8]}...{key[-4:]}"
         return None
 
-    def _try_next_model(self) -> bool:
-        """Try switching to the next model. Returns True if successful."""
-        if self.current_model_index < len(self.models) - 1:
-            self.current_model_index += 1
-            print(f"   ⚡ Switching to model: {self.current_model}")
-            return True
-        return False
+    @property
+    def current_model(self):
+        for m in MODELS:
+            if _rl.can_request(m, 0):
+                return m
+        return MODELS[0]
 
-    def _try_next_api_key(self) -> bool:
-        """Try switching to the next API key. Returns True if successful."""
-        if self.current_key_index < len(self.api_keys) - 1:
-            self.current_key_index += 1
-            self.current_model_index = 0  # Reset to first model
-            self._init_client()
-            print(f"   🔑 Switching to API key: {self.current_api_key}")
-            return True
-        return False
+    @property
+    def current_api_key(self):
+        k = self.api_keys[self.key_idx] if self.api_keys else None
+        return f"{k[:8]}...{k[-4:]}" if k else None
 
-    def _reset_for_new_request(self):
-        """Reset model index for a new request (keeps current API key if working)."""
-        # Don't reset - keep current working configuration
-        pass
-
-    def call(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float = 0.2,
-        max_retries: int = 3,
-    ) -> tuple[str, bool]:
-        """
-        Call the LLM with automatic fallback.
-
-        Returns:
-            tuple: (response_text, is_mock)
-        """
-        if not OPENAI_AVAILABLE:
-            return self._mock_response(system_prompt, user_prompt), True
-
+    def call(self, sys_p: str, usr_p: str, temp: float = 0.2) -> tuple[str, bool]:
+        if not GROQ_AVAILABLE:
+            raise ImportError("pip install groq")
         if not self._client:
-            return self._mock_response(system_prompt, user_prompt), True
+            raise RuntimeError("No API keys")
 
-        last_error = None
-        attempts = 0
-        max_attempts = len(self.models) * len(self.api_keys) * max_retries
+        tokens = len(sys_p + usr_p) // 4
 
-        while attempts < max_attempts:
-            attempts += 1
+        for _ in range(20):
+            model = next((m for m in MODELS if _rl.can_request(m, tokens)), None)
+            if not model:
+                wait = min(_rl.wait_time(), 30)
+                print(f"   ⏳ All models busy. Waiting {wait:.0f}s...")
+                time.sleep(wait)
+                continue
+
+            ctx, max_out, _, _ = MODEL_SPECS[model]
+            if tokens > ctx * 0.9:
+                print(f"   ⏭️  {model}: tokens exceed context")
+                _rl.set_cooldown(model, 60)
+                continue
 
             try:
-                response = self._client.chat.completions.create(
-                    model=self.current_model,
+                resp = self._client.chat.completions.create(
+                    model=model,
                     messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
+                        {"role": "system", "content": sys_p},
+                        {"role": "user", "content": usr_p},
                     ],
-                    temperature=temperature,
+                    temperature=temp,
+                    max_tokens=min(max_out, 8192),
                 )
-                return response.choices[0].message.content, False
+                _rl.record(
+                    model, resp.usage.total_tokens if resp.usage else tokens + 500
+                )
+                return resp.choices[0].message.content, False
+
+            except groq.RateLimitError as e:
+                retry = 60.0
+                try:
+                    retry = (
+                        float(e.response.headers.get("retry-after", 60))
+                        if e.response
+                        else 60
+                    )
+                except:
+                    pass
+                print(f"   ⚠️  Rate limit {model}: {min(retry, 120):.0f}s cooldown")
+                _rl.set_cooldown(model, min(retry, 120))
+
+            except groq.APIStatusError as e:
+                cd = 300 if e.status_code == 413 else 30
+                print(f"   ⚠️  API {e.status_code} {model}")
+                _rl.set_cooldown(model, cd)
 
             except Exception as e:
-                last_error = e
-                error_str = str(e)
-                error_type = type(e).__name__
+                print(f"   ⚠️  Error {model}: {str(e)[:50]}")
+                _rl.set_cooldown(model, 15)
 
-                # Check for rate limit error (429) or quota exceeded
-                is_rate_limit = (
-                    "429" in error_str
-                    or "rate_limit" in error_str.lower()
-                    or "too many requests" in error_str.lower()
-                    or "RateLimitError" in error_type
-                )
-                is_model_error = "model" in error_str.lower() and (
-                    "not found" in error_str.lower() or "invalid" in error_str.lower()
-                )
-
-                if is_rate_limit or is_model_error:
-                    print(
-                        f"   ⚠️  {'Rate limit' if is_rate_limit else 'Model error'}: {self.current_model}"
-                    )
-
-                    # Try next model first
-                    if self._try_next_model():
-                        continue
-
-                    # If all models exhausted, try next API key
-                    if self._try_next_api_key():
-                        continue
-
-                    # All options exhausted
-                    break
-                else:
-                    # For other errors, retry with backoff
-                    print(f"   ⚠️  LLM Error ({error_type}): {error_str[:100]}")
-                    time.sleep(1)
-
-        # All retries exhausted
-        if self.use_mock_on_failure:
-            print("   ⚠️  All API options exhausted. Using mock response.")
-            return self._mock_response(system_prompt, user_prompt), True
-        else:
-            raise RuntimeError(f"LLM call failed after all retries: {last_error}")
-
-    def _mock_response(self, system_prompt: str, user_prompt: str) -> str:
-        """Generate a mock response when API is unavailable."""
-        if (
-            "identify" in system_prompt.lower()
-            or "test_scenarios" in system_prompt.lower()
-        ):
-            return """{
-  "test_scenarios": [
-    {"scenario_description": "Test main function with valid input", "priority": "High"},
-    {"scenario_description": "Test main function with empty input", "priority": "Medium"},
-    {"scenario_description": "Test main function with invalid type", "priority": "Medium"},
-    {"scenario_description": "Test edge case with very large input", "priority": "Low"}
-  ]
-}"""
-        elif "pytest" in system_prompt.lower() or "generate" in system_prompt.lower():
-            return '''import pytest
-
-def test_main_function_with_valid_input():
-    """Test that the main function works with valid input."""
-    assert True
-
-def test_main_function_with_empty_input():
-    """Test that the main function handles empty input."""
-    assert True
-
-def test_main_function_with_invalid_type():
-    """Test that the main function raises appropriate error for invalid types."""
-    with pytest.raises((TypeError, ValueError)):
-        pass
-
-def test_edge_case_with_very_large_input():
-    """Test behavior with very large input values."""
-    assert True
-'''
-        elif "evaluat" in system_prompt.lower():
-            return """{
-  "execution_summary": {"total_tests": 4, "passed": 4, "failed": 0},
-  "code_coverage_percentage": 85.0,
-  "actionable_recommendations": ["Add more edge case tests", "Improve error handling coverage"],
-  "security_issues": [],
-  "has_severe_security_issues": false
-}"""
-        else:
-            return '{"status": "mock_response", "message": "API unavailable"}'
+        raise RuntimeError("Exhausted all LLM attempts")
 
 
-# Convenience function for simple usage
-def create_llm_client(use_mock_on_failure: bool = True) -> LLMClient:
-    """Create and return a configured LLM client."""
-    return LLMClient(use_mock_on_failure=use_mock_on_failure)
+def create_llm_client(**kw) -> LLMClient:
+    return LLMClient(**kw)

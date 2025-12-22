@@ -31,7 +31,7 @@ from pipeline.prompts import (
 
 class BaseAgent:
     def __init__(self, llm_client=None, prompt_history: List[dict] = None):
-        self.llm_client = llm_client or create_llm_client(use_mock_on_failure=True)
+        self.llm_client = llm_client or create_llm_client(use_mock_on_failure=False)
         self.prompt_history = prompt_history if prompt_history is not None else []
 
     def call_llm(
@@ -83,7 +83,7 @@ class IdentificationAgent(BaseAgent):
             # print(f"   Using {max_workers} parallel workers for faster processing")
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all chunks for processing 
+                # Submit all chunks for processing
                 future_to_chunk = {
                     executor.submit(
                         self._process_chunk,
@@ -129,7 +129,7 @@ class IdentificationAgent(BaseAgent):
     ) -> List[TestScenario]:
         """Process a single code chunk to identify test scenarios."""
         # Create a dedicated LLM client for this thread/worker
-        llm_client = create_llm_client(use_mock_on_failure=True)
+        llm_client = create_llm_client(use_mock_on_failure=False)
 
         # print(f"   Processing chunk {chunk_idx}/{total_chunks}...")
 
@@ -182,8 +182,8 @@ class ImplementationAgent(BaseAgent):
 
         # Use chunked reading and limit to reasonable amount
         code_chunks = read_file_contents_chunked(python_files)
-        # Take first 5 chunks (~1000 lines) to provide enough context without exceeding tokens
-        max_chunks = 5
+        # Take first 10 chunks to provide enough context without exceeding tokens
+        max_chunks = 10
         selected_chunks = code_chunks[:max_chunks]
         code_context = "\n\n".join(selected_chunks)
 
@@ -283,7 +283,12 @@ Generate a complete, executable PyTest file."""
         print(f"\n🔄 Generating additional tests: {', '.join(reasons)}...")
 
         python_files = gather_python_files(codebase_path)
-        code_context = read_file_contents(python_files[:10])
+        # Limit context size to prevent 413 errors - use chunked reading
+        code_chunks = read_file_contents_chunked(python_files)
+        # Use first 10 chunks to keep under token limits
+        code_context = "\n\n".join(code_chunks[:10])[
+            :15000
+        ]  # Hard limit at 15000 chars
 
         # Build file list for the AI to understand the project structure
         file_list = "\n".join(f"  - {f.name}" for f in python_files)
@@ -353,12 +358,12 @@ WINDOWS COMPATIBILITY:
 - For keyboard interrupt tests, mock the behavior instead of sending real signals
 {error_context}{security_context}
 Existing tests (may have errors - fix them):
-{existing_tests[:3000]}
+{existing_tests[:1500]}
 
 Uncovered code areas from coverage report:
-{uncovered_areas}
+{uncovered_areas[:2000]}
 
-Source code to test:
+Source code to test (truncated to fit limits):
 {code_context}
 
 IMPORTANT RULES:
@@ -505,14 +510,17 @@ class EvaluationAgent(BaseAgent):
 
         print(f"   Actual coverage measured: {actual_coverage:.1f}%")
 
-        # Gather source code for security analysis
+        # Gather source code for security analysis - limit size to prevent 413
         python_files = gather_python_files(codebase_path)
-        source_code = read_file_contents(python_files[:10])
+        code_chunks = read_file_contents_chunked(python_files)
+        source_code = "\n\n".join(code_chunks[:10])[:15000]  # Max 15000 chars
 
-        scenarios_json = json.dumps(asdict(scenarios), indent=2)
+        scenarios_json = json.dumps(asdict(scenarios), indent=2)[
+            :2000
+        ]  # Limit scenarios too
         user_prompt = f"""Evaluate these PyTest results AND perform security analysis:
 
-Scenarios: {scenarios_json}
+Scenarios (summary): {scenarios_json}
 
 Test Results:
 - Total tests: {total_tests}
@@ -521,10 +529,10 @@ Test Results:
 - Code Coverage: {actual_coverage:.1f}%
 
 PyTest Output:
-{test_results.get("output", "")[:3000]}
+{test_results.get("output", "")[:2000]}
 
 Source Code (analyze for security issues):
-{source_code[:5000]}
+{source_code}
 
 Provide:
 1. Actionable recommendations to improve test coverage and fix failures
@@ -545,9 +553,22 @@ Respond with JSON containing execution_summary, code_coverage_percentage, securi
 
             data = json.loads(response)
 
+            # Fix: Handle case where LLM returns a list [ { ... } ] instead of a dict { ... }
+            if isinstance(data, list):
+                if data and isinstance(data[0], dict):
+                    data = data[0]
+                else:
+                    # If it's a list but not containing a dict, validation will fail gracefully below
+                    # when looking for keys in an empty dict or by letting it proceed if it was just []
+                    data = {}
+
             # Parse security issues
             security_issues = []
             for issue_data in data.get("security_issues", []):
+                # Fix: Ensure issue_data is a dictionary before calling .get()
+                if not isinstance(issue_data, dict):
+                    continue
+
                 security_issues.append(
                     SecurityIssue(
                         severity=issue_data.get("severity", "low"),
@@ -582,7 +603,7 @@ Respond with JSON containing execution_summary, code_coverage_percentage, securi
                 security_issues=security_issues,
                 has_severe_security_issues=has_severe,
             )
-        except (json.JSONDecodeError, KeyError) as e:
+        except (json.JSONDecodeError, KeyError, AttributeError) as e:
             # Return actual values even if LLM parsing fails
             return TestEvaluationOutput(
                 execution_summary=ExecutionSummary(

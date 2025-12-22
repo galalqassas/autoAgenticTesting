@@ -54,7 +54,7 @@ class PythonTestingPipeline:
 
     def __init__(self, model: Optional[str] = None):
         # Use the LLM client from llm_config for automatic API key rotation and model fallback
-        self.llm_client = create_llm_client(use_mock_on_failure=True)
+        self.llm_client = create_llm_client(use_mock_on_failure=False)
         self.prompt_history = []  # Track all prompts for later analysis
 
         # Initialize agents
@@ -257,6 +257,7 @@ class PythonTestingPipeline:
 
                 # Track progress to prevent getting stuck
                 best_coverage = 0.0
+                best_test_code = None  # Will store snapshot of best test code
                 best_severe_count = float("inf")
                 consecutive_no_progress = 0
 
@@ -311,6 +312,8 @@ class PythonTestingPipeline:
                     progress_made = False
                     if current_coverage > best_coverage:
                         best_coverage = current_coverage
+                        # Snapshot the current test code (strings are immutable, so assignment is safe)
+                        best_test_code = current_test_code
                         progress_made = True
 
                     if current_severe_count < best_severe_count:
@@ -393,6 +396,15 @@ class PythonTestingPipeline:
                         print("   Recommendations:")
                         for rec in recommendations[:5]:
                             print(f"   • {rec}")
+
+                # Restore best test code if final iteration is worse
+                if best_test_code and best_coverage > current_coverage:
+                    print(
+                        f"\n🔄 Restoring test code with best coverage: {best_coverage:.1f}%"
+                    )
+                    with open(current_test_file, "w", encoding="utf-8") as f:
+                        f.write(best_test_code)
+                    current_test_code = best_test_code
 
             results["status"] = "completed"
 
