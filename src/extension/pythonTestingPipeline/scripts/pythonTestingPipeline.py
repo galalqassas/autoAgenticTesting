@@ -13,12 +13,10 @@ Example:
 """
 
 import argparse
-
 import json
-
 import re
-
 import sys
+import time as time_module
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -77,10 +75,7 @@ class PythonTestingPipeline:
 
     def save_prompts(self, output_dir: Path, run_id: str = None) -> Path:
         """Saves all prompts from this run to a JSON file."""
-        import time as time_module
-
-        if run_id is None:
-            run_id = time_module.strftime("%Y%m%d_%H%M%S")
+        run_id = run_id or time_module.strftime("%Y%m%d_%H%M%S")
 
         prompts_file = output_dir / f"prompts_{run_id}.json"
 
@@ -103,43 +98,76 @@ class PythonTestingPipeline:
         """Agent 1: Identifies test scenarios from the codebase using parallel processing."""
         return self.identification_agent.run(codebase_path)
 
+    def interpret_user_input(self, user_input: str, scenarios: TestScenariosOutput) -> dict:
+        """Uses LLM to interpret user input and determine action."""
+        scenario_list = "\n".join(f"{i+1}. [{s.priority}] {s.scenario_description}" 
+                                   for i, s in enumerate(scenarios.test_scenarios))
+        prompt = f"""Scenarios:\n{scenario_list}\n\nUser said: "{user_input}"
+
+Determine intent. Return JSON:
+{{"action": "approve"|"remove"|"refine", "indices": [1,2,...] if removing, "feedback": "..." if refining}}"""
+        try:
+            response, _ = self.llm_client.call(
+                sys_p="Interpret user intent for test scenario approval. Return only valid JSON.",
+                usr_p=prompt
+            )
+            match = re.search(r"\{[^{}]*\}", response)
+            if match:
+                return json.loads(match.group())
+        except Exception:
+            pass
+        return {"action": "refine", "feedback": user_input}  # Default: treat as feedback
+
+    def refine_scenarios(self, scenarios: TestScenariosOutput, feedback: str) -> TestScenariosOutput:
+        """Uses LLM to refine scenarios based on feedback."""
+        current = "\n".join(f"- [{s.priority}] {s.scenario_description}" for s in scenarios.test_scenarios)
+        prompt = f"Scenarios:\n{current}\n\nFeedback: {feedback}\n\nReturn refined JSON: {{\"test_scenarios\": [{{\"priority\": \"High/Medium/Low\", \"scenario_description\": \"...\"}}]}}"
+        try:
+            response, _ = self.llm_client.call(sys_p="Refine test scenarios. Return valid JSON only.", usr_p=prompt)
+            match = re.search(r"\{[\s\S]*\}", response)
+            if match:
+                data = json.loads(match.group())
+                from pipeline.models import TestScenario
+                new = [TestScenario(priority=s.get("priority", "Medium"), scenario_description=s["scenario_description"])
+                       for s in data.get("test_scenarios", []) if "scenario_description" in s]
+                if new:
+                    print(f"   Refined to {len(new)} scenarios")
+                    return TestScenariosOutput(test_scenarios=new)
+        except Exception as e:
+            print(f"   Could not refine: {e}")
+        return scenarios
+
     def request_approval(self, scenarios: TestScenariosOutput) -> TestScenariosOutput:
-        """
-        Presents scenarios for human approval.
-        """
-        print("\n📋 Test Scenarios for Approval:")
-        print("-" * 60)
+        """Natural language approval flow using LLM interpretation."""
+        def display(scens):
+            print("\n" + "=" * 60)
+            print("TEST SCENARIOS FOR REVIEW")
+            print("=" * 60)
+            for i, s in enumerate(scens.test_scenarios, 1):
+                icon = {"High": "!", "Medium": "~", "Low": "."}.get(s.priority, " ")
+                print(f"  {i}. [{icon}] {s.scenario_description}")
+            print(f"\n  Total: {len(scens.test_scenarios)} | Type anything to proceed or provide feedback")
+            print("-" * 60)
 
-        for i, scenario in enumerate(scenarios.test_scenarios, 1):
-            print(f"{i}. [{scenario.priority}] {scenario.scenario_description}")
-
-        print("-" * 60)
-        print(f"\nTotal: {len(scenarios.test_scenarios)} scenarios")
-
+        display(scenarios)
         while True:
-            response = input("\nApprove all scenarios? (yes/no/edit): ").strip().lower()
-
-            if response in ("yes", "y"):
+            user_input = input("\n>>> ").strip()
+            if not user_input:
+                continue
+            intent = self.interpret_user_input(user_input, scenarios)
+            action = intent.get("action", "refine")
+            
+            if action == "approve":
+                print("Approved!")
                 return scenarios
-            elif response in ("no", "n"):
-                raise ValueError("Scenarios not approved")
-            elif response in ("edit", "e"):
-                # Simple editing - remove scenarios by number
-                to_remove = input(
-                    "Enter scenario numbers to remove (comma-separated): "
-                ).strip()
-                if to_remove:
-                    indices_to_remove = set(
-                        int(x.strip()) - 1 for x in to_remove.split(",")
-                    )
-                    scenarios.test_scenarios = [
-                        s
-                        for i, s in enumerate(scenarios.test_scenarios)
-                        if i not in indices_to_remove
-                    ]
-                return scenarios
-            else:
-                print("Please enter 'yes', 'no', or 'edit'")
+            elif action == "remove":
+                indices = {int(i) - 1 for i in intent.get("indices", []) if isinstance(i, int)}
+                scenarios.test_scenarios = [s for i, s in enumerate(scenarios.test_scenarios) if i not in indices]
+                print(f"   Removed {len(indices)} scenario(s)")
+                display(scenarios)
+            else:  # refine
+                scenarios = self.refine_scenarios(scenarios, intent.get("feedback", user_input))
+                display(scenarios)
 
     def generate_test_code(
         self, scenarios: TestScenariosOutput, codebase_path: Path, output_dir: Path
@@ -409,10 +437,7 @@ class PythonTestingPipeline:
             results["status"] = "completed"
 
             # Save all prompts to JSON for later analysis
-            import time as time_module
-
-            run_id = str(int(time_module.time()))
-            prompts_file = self.save_prompts(output_dir, run_id)
+            prompts_file = self.save_prompts(output_dir, str(int(time_module.time())))
             results["prompts_file"] = str(prompts_file)
             results["total_prompts"] = len(self.prompt_history)
 
@@ -438,11 +463,8 @@ class PythonTestingPipeline:
 
             # Still save prompts even on failure
             try:
-                import time as time_module
-
-                run_id = str(int(time_module.time()))
                 prompts_file = self.save_prompts(
-                    output_dir or codebase_path / "tests", run_id
+                    output_dir or codebase_path / "tests", str(int(time_module.time()))
                 )
                 print(f"   Prompts saved to: {prompts_file}")
             except Exception as save_error:
@@ -484,14 +506,7 @@ def main():
         sys.exit(1)
 
     pipeline = PythonTestingPipeline(model=args.model)
-    # Determine run_tests behavior with support for both flags
-    if args.run_tests:
-        run_tests_flag = True
-    elif getattr(args, "no_run_tests", False):
-        run_tests_flag = False
-    else:
-        # Default behavior: run tests unless explicitly disabled
-        run_tests_flag = True
+    run_tests_flag = not args.no_run_tests  # Run tests by default unless --no-run-tests
 
     results = pipeline.run_pipeline(
         codebase_path=args.codebase_path,

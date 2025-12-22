@@ -33,69 +33,17 @@ MODEL_SPECS = {
 MODELS = list(MODEL_SPECS.keys())
 
 
-class _RateLimiter:
-    """Thread-safe singleton rate limiter."""
-
-    _instance = None
-    _lock = threading.Lock()
-
-    def __new__(cls):
-        if not cls._instance:
-            with cls._lock:
-                if not cls._instance:
-                    inst = super().__new__(cls)
-                    inst._lock = threading.Lock()
-                    inst.history = {m: [] for m in MODELS}
-                    inst.cooldowns = {m: 0.0 for m in MODELS}
-                    cls._instance = inst
-        return cls._instance
-
-    def set_cooldown(self, model: str, seconds: float):
-        with self._lock:
-            self.cooldowns[model] = time.time() + seconds
-
-    def can_request(self, model: str, tokens: int) -> bool:
-        now = time.time()
-        if now < self.cooldowns.get(model, 0):
-            return False
-        spec = MODEL_SPECS.get(model)
-        if not spec:
-            return True
-        ctx, _, rpm, tpm = spec
-        with self._lock:
-            self.history[model] = [
-                (t, c) for t, c in self.history[model] if now - t < 60
-            ]
-            if len(self.history[model]) >= rpm * 0.8:
-                return False
-            if sum(c for _, c in self.history[model]) + tokens >= tpm * 0.8:
-                return False
-        return True
-
-    def record(self, model: str, tokens: int):
-        with self._lock:
-            self.history[model].append((time.time(), tokens))
-
-    def wait_time(self) -> float:
-        now = time.time()
-        waits = []
-        for m in MODELS:
-            cd = self.cooldowns.get(m, 0) - now
-            if cd > 0:
-                waits.append(cd)
-            elif self.history[m]:
-                oldest = min(t for t, _ in self.history[m])
-                waits.append(max(0, 60 - (now - oldest)))
-        return min(waits) if waits else 5.0
-
-
-_rl = _RateLimiter()
-
 
 class LLMClient:
+    """LLM client with per-key rate limiting."""
+
+    # Class-level storage for per-key cooldowns: {(key_hash, model): expiry_time}
+    _cooldowns = {}
+    _lock = threading.Lock()
+
     def __init__(self, **_):
         self.api_keys = [
-            v for k, v in os.environ.items() if k.startswith("GROQ_API_KEY")
+            v for k, v in sorted(os.environ.items()) if k.startswith("GROQ_API_KEY")
         ]
         if not self.api_keys:
             print("⚠️  No GROQ_API_KEYs found.")
@@ -111,12 +59,31 @@ class LLMClient:
             )
         return None
 
+    def _key_hash(self):
+        """Short hash of current API key for tracking."""
+        return self.api_keys[self.key_idx][:12] if self.api_keys else ""
+
+    def _set_cooldown(self, model: str, seconds: float):
+        """Set cooldown for current key + model."""
+        with self._lock:
+            self._cooldowns[(self._key_hash(), model)] = time.time() + seconds
+
+    def _can_request(self, model: str) -> bool:
+        """Check if current key can request this model."""
+        with self._lock:
+            expiry = self._cooldowns.get((self._key_hash(), model), 0)
+            return time.time() >= expiry
+
+    def _find_available_model(self) -> str:
+        """Find a model available for current key."""
+        for m in MODELS:
+            if self._can_request(m):
+                return m
+        return None
+
     @property
     def current_model(self):
-        for m in MODELS:
-            if _rl.can_request(m, 0):
-                return m
-        return MODELS[0]
+        return self._find_available_model() or MODELS[0]
 
     @property
     def current_api_key(self):
@@ -131,18 +98,27 @@ class LLMClient:
 
         tokens = len(sys_p + usr_p) // 4
 
-        for _ in range(20):
-            model = next((m for m in MODELS if _rl.can_request(m, tokens)), None)
-            if not model:
-                wait = min(_rl.wait_time(), 30)
-                print(f"   ⏳ All models busy. Waiting {wait:.0f}s...")
-                time.sleep(wait)
+        for attempt in range(20):
+            # Try each API key to find one with an available model
+            for key_attempt in range(len(self.api_keys)):
+                model = self._find_available_model()
+                if model:
+                    break
+                # Rotate to next key
+                self.key_idx = (self.key_idx + 1) % len(self.api_keys)
+                self._client = self._make_client()
+            else:
+                # No key has an available model, wait
+                print(f"   ⏳ All keys/models busy. Waiting 10s...")
+                time.sleep(10)
                 continue
+
+            if key_attempt > 0:
+                print(f"   🔄 Using API key {self.key_idx + 1}/{len(self.api_keys)}")
 
             ctx, max_out, _, _ = MODEL_SPECS[model]
             if tokens > ctx * 0.9:
-                print(f"   ⏭️  {model}: tokens exceed context")
-                _rl.set_cooldown(model, 60)
+                self._set_cooldown(model, 60)
                 continue
 
             try:
@@ -155,9 +131,6 @@ class LLMClient:
                     temperature=temp,
                     max_tokens=min(max_out, 8192),
                 )
-                _rl.record(
-                    model, resp.usage.total_tokens if resp.usage else tokens + 500
-                )
                 return resp.choices[0].message.content, False
 
             except groq.RateLimitError as e:
@@ -168,19 +141,19 @@ class LLMClient:
                         if e.response
                         else 60
                     )
-                except:
+                except Exception:
                     pass
                 print(f"   ⚠️  Rate limit {model}: {min(retry, 120):.0f}s cooldown")
-                _rl.set_cooldown(model, min(retry, 120))
+                self._set_cooldown(model, min(retry, 120))
 
             except groq.APIStatusError as e:
                 cd = 300 if e.status_code == 413 else 30
                 print(f"   ⚠️  API {e.status_code} {model}")
-                _rl.set_cooldown(model, cd)
+                self._set_cooldown(model, cd)
 
             except Exception as e:
                 print(f"   ⚠️  Error {model}: {str(e)[:50]}")
-                _rl.set_cooldown(model, 15)
+                self._set_cooldown(model, 15)
 
         raise RuntimeError("Exhausted all LLM attempts")
 

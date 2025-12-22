@@ -45,6 +45,17 @@ class PipelineRunner:
         if self.process:
             self.process.terminate()
 
+    def send_input(self, text: str) -> bool:
+        """Send input to subprocess stdin. Returns False if not running."""
+        if not self.is_running or not self.process or not self.process.stdin:
+            return False
+        try:
+            self.process.stdin.write(text + "\n")
+            self.process.stdin.flush()
+            return True
+        except (BrokenPipeError, OSError):
+            return False
+
     def _run(self, cmd: list):
         """Execute the pipeline and stream output."""
         try:
@@ -56,6 +67,7 @@ class PipelineRunner:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.PIPE,
                 text=True,
                 bufsize=1,
                 cwd=str(self.script_path.parent),

@@ -220,8 +220,35 @@ class PipelineGUI(ctk.CTk):
             font=ctk.CTkFont(family="Consolas", size=12),
             corner_radius=8,
         )
-        self.log_text.pack(fill="both", expand=True, padx=16, pady=(8, 16))
+        self.log_text.pack(fill="both", expand=True, padx=16, pady=(8, 8))
         self.log_text.configure(state="disabled")
+
+        # Input area for sending commands to pipeline
+        input_frame = ctk.CTkFrame(frame, fg_color="transparent", height=36)
+        input_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+        self.input_entry = ctk.CTkEntry(
+            input_frame,
+            placeholder_text="Type input and press Enter or Send...",
+            fg_color=COLORS["bg_console"],
+            border_color=COLORS["border"],
+            text_color=COLORS["text_primary"],
+            font=ctk.CTkFont(family="Consolas", size=12),
+            height=32,
+        )
+        self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.input_entry.bind("<Return>", lambda e: self._send_input())
+
+        ctk.CTkButton(
+            input_frame,
+            text="Send",
+            width=70,
+            height=32,
+            fg_color=COLORS["button_primary"],
+            hover_color=COLORS["button_hover"],
+            font=ctk.CTkFont(size=12),
+            command=self._send_input,
+        ).pack(side="right")
 
     # ==================== Actions ====================
     def _browse_path(self):
@@ -261,6 +288,15 @@ class PipelineGUI(ctk.CTk):
             fg_color=COLORS["accent_red"],
             hover_color=COLORS["button_stop"],
         )
+
+    def _send_input(self):
+        """Send input from entry to pipeline subprocess."""
+        text = self.input_entry.get().strip()
+        if not text:
+            return
+        if self.runner.send_input(text):
+            self._log(f"> {text}\n")
+        self.input_entry.delete(0, "end")
 
     # ==================== Callbacks ====================
     def _on_output(self, line: str):
@@ -334,19 +370,15 @@ class PipelineGUI(ctk.CTk):
     @contextmanager
     def _log_editable(self):
         """Context manager for safe log text editing."""
-        try:
-            self.log_text.configure(state="normal")
-            yield self.log_text
-            self.log_text.configure(state="disabled")
-        except Exception as e:
-            logger.warning(f"Log operation failed: {e}")
+        self.log_text.configure(state="normal")
+        yield self.log_text
+        self.log_text.configure(state="disabled")
 
     def _log(self, msg: str):
         """Append message to log console."""
         with self._log_editable():
             self.log_text.insert("end", msg)
             self.log_text.see("end")
-        self.update_idletasks()
 
     def _clear_log(self):
         """Clear the log console."""
