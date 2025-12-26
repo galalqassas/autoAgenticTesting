@@ -6,15 +6,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from llm_config import create_llm_client
 from pipeline.code_utils import sanitize_code, validate_syntax
-from pipeline.file_utils import (
-    gather_python_files,
-    read_file_contents,
-    read_file_contents_chunked,
-)
+from pipeline.file_utils import gather_python_files, read_file_contents_chunked
 from pipeline.models import (
     ExecutionSummary,
     SecurityIssue,
