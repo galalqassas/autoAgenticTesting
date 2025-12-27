@@ -7,47 +7,64 @@ on:
     branches: ["main"]
 
 jobs:
-  test:
+  install:
+    name: Install & Lint
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Get the code
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # 2. Setup Python
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
-
-      # 3. Install System Dependencies (for GUI)
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb python3-tk
-
-      # 4. Install Python Dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov customtkinter fastapi uvicorn httpx pydantic
+          pip install -r requirements.txt
+      - name: Verify imports
+        run: python -c "import fastapi; import groq; print('All imports OK')"
 
-      # 5. Run GUI Tests (with virtual display)
-      - name: Run GUI Tests
-        run: xvfb-run -a python -m pytest src/extension/GUI/tests/ -v --tb=short
-
-      # 6. Run Agent Tests
+  agents:
+    name: Agent Tests
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install pytest pytest-cov groq
       - name: Run Agent Tests
         working-directory: src/extension/pythonTestingPipeline/scripts
         run: python -m pytest pipeline/tests/test_agents.py -v --tb=short
 
-      # 7. Run API Tests
+  gui:
+    name: GUI Tests
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb python3-tk
+      - name: Install Python dependencies
+        run: pip install pytest customtkinter fastapi uvicorn httpx pydantic matplotlib
+      - name: Run GUI Tests
+        run: xvfb-run -a python -m pytest src/extension/GUI/tests/ -v --tb=short
       - name: Run API Tests
         run: python -m pytest src/extension/api/tests/test_api.py -v --tb=short
 
-      # 8. Deploy (placeholder)
-      - name: Deploy
-        if: github.ref == 'refs/heads/main'
-        run: echo "All tests passed - ready for deployment"
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Image
+        run: docker build -t agentic-testing .
