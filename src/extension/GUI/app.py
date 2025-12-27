@@ -11,7 +11,7 @@ from tkinter import filedialog
 import customtkinter as ctk
 
 from .theme import COLORS
-from .widgets import PhaseStep, StatsCard, PerformanceGraph
+from .widgets import PhaseStep, StatsCard, PerformanceGraph, AgentFlow
 from .log_parser import LogParser
 from .pipeline_runner import PipelineRunner
 
@@ -53,7 +53,6 @@ class PipelineGUI(ctk.CTk):
         )
         self.runner = PipelineRunner(script_path, self._on_output, self._on_complete)
         self.parser = LogParser()
-        self.phases = {}
         self.stats_cards = {}
 
     def _build_ui(self):
@@ -147,21 +146,9 @@ class PipelineGUI(ctk.CTk):
         self._build_console(main)
 
     def _build_stepper(self, parent):
-        """Build the phase stepper."""
-        frame = ctk.CTkFrame(parent, fg_color="transparent", height=100)
-        frame.pack(fill="x", pady=(0, 24))
-
-        container = ctk.CTkFrame(frame, fg_color="transparent")
-        container.place(relx=0.5, rely=0.5, anchor="center")
-
-        for i, (label, icon) in enumerate(self.PHASES):
-            if i > 0:
-                ctk.CTkFrame(
-                    container, width=60, height=2, fg_color=COLORS["border"]
-                ).pack(side="left", pady=(0, 20))
-            phase = PhaseStep(container, label, icon)
-            phase.pack(side="left", padx=16)
-            self.phases[label.lower()] = phase
+        """Build the agent flow stepper."""
+        self.agent_flow = AgentFlow(parent)
+        self.agent_flow.pack(fill="x", pady=(0, 24))
 
     def _build_stats_row(self, parent):
         """Build the stats cards and graph row."""
@@ -310,9 +297,10 @@ class PipelineGUI(ctk.CTk):
 
         if result.phase_update:
             phase, state = result.phase_update
-            if phase in self.phases:
-                self.phases[phase].set_state(state)
-                self.update_idletasks()
+            self.update_idletasks()
+
+        if result.agent_activation:
+            self.agent_flow.add_agent(result.agent_activation)
 
         if result.coverage:
             self.stats_cards["coverage"].update_stats(
@@ -355,13 +343,13 @@ class PipelineGUI(ctk.CTk):
             fg_color=COLORS["button_primary"],
             hover_color=COLORS["button_hover"],
         )
+        self.agent_flow.show_end()
         self._log(f"\n{'=' * 60}\nPipeline execution finished.\n")
 
     # ==================== Helpers ====================
     def _reset_ui(self):
         """Reset UI to initial state."""
-        for phase in self.phases.values():
-            phase.set_state("pending")
+        self.agent_flow.reset()
         for name, value, subtext, _ in self.STATS:
             self.stats_cards[name.lower()].update_stats(value, subtext)
         self.graph.reset()

@@ -16,6 +16,7 @@ class ParseResult:
     scenarios: Optional[str] = None
     security_issues: Optional[str] = None
     security_severity: Optional[str] = None  # "none", "low", or count
+    agent_activation: Optional[int] = None  # 1, 2, or 3
 
 
 class LogParser:
@@ -48,6 +49,13 @@ class LogParser:
     SECURITY_MINOR_PATTERN = re.compile(r"Minor security issues.*?:\s*(\d+)")
     SECURITY_SEVERE_PATTERN = re.compile(r"Severe security issues:\s*(\w+)")
 
+    # Agent activation patterns
+    AGENT_PATTERNS = [
+        (re.compile(r"Agent 1:"), 1),
+        (re.compile(r"Agent 2:|Generating additional tests"), 2),
+        (re.compile(r"Agent 3:"), 3),
+    ]
+
     def parse(self, line: str) -> ParseResult:
         """Parse a log line and return extracted data."""
         result = ParseResult()
@@ -56,7 +64,11 @@ class LogParser:
         for pattern, updates in self.PHASE_PATTERNS:
             if re.search(pattern, line):
                 result.phase_update = updates[-1]
-                result.phase_updates = updates
+
+        # Check agent activations
+        for pattern, agent_num in self.AGENT_PATTERNS:
+            if pattern.search(line):
+                result.agent_activation = agent_num
                 break
 
         # Extract metrics using pattern matching

@@ -2,7 +2,7 @@
 
 **An AI-powered automated testing pipeline that autonomously identifies test scenarios, generates PyTest scripts, and evaluates code coverage and security.**
 
-It features a multi-agent architecture (Identification, Implementation, Evaluation), interactive dashboards, and comprehensive security analysis.
+It features a multi-agent architecture (Identification, Implementation, Evaluation), interactive GUI, and comprehensive security analysis.
 
 ## 🚀 How to Run
 
@@ -24,17 +24,7 @@ python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <pat
 
 **Options:** `--auto-approve`, `--no-run-tests`
 
-### 3. Dashboard
-
-Visualize results, coverage, and agent conversations.
-
-```bash
-cd dashboard
-pip install -r requirements.txt
-python -m streamlit run app.py
-```
-
-### 4. VS Code Extension
+### 3. VS Code Extension
 
 1. `npm install` then `npm run compile`
 2. Press `F5` to launch.
