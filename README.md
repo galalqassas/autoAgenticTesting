@@ -6,7 +6,7 @@ It features a multi-agent architecture (Identification, Implementation, Evaluati
 
 ## 🚀 How to Run
 
-## Follow the prerequisits first then the follwing 3 steps
+Follow the **Prerequisites** first then choose one of the following:
 
 ### 1. GUI (Recommended)
 
@@ -16,17 +16,35 @@ The easiest way to use the pipeline.
 python src/extension/GUI/main.py
 ```
 
-### 2. CLI
+### 2. API Service
 
-Run the pipeline directly from the command line.
+Expose the pipeline as a REST service with 25+ endpoints.
+
+```bash
+# Run server (Recommended method)
+python -m uvicorn src.extension.api.main:app --port 8000
+
+# View Documentation
+# Open http://localhost:8000/ (Redirects to /docs)
+```
+
+#### Example Request:
+
+```bash
+curl -X POST http://localhost:8000/agents/identify \
+  -H "Content-Type: application/json" \
+  -d '{"codebase_path": "/absolute/path/to/code"}'
+```
+
+### 3. CLI
+
+Run directly from the command line.
 
 ```bash
 python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <path_to_target> [options]
 ```
 
-**Options:** `--auto-approve`, `--no-run-tests`
-
-### 3. VS Code Extension
+### 4. VS Code Extension
 
 1. `npm install` then `npm run compile`
 2. Press `F5` to launch.
@@ -41,13 +59,13 @@ python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <pat
 ## 📦 Installation
 
 ```bash
-git clone <repository_url>
+git clone https://github.com/galalqassas/autoAgenticTesting.git
 cd autoAgenticTesting
 
-#creat virtual enviroment
+# Create virtual environment
 python -m venv venv
 
-#Activate the virtual enviroment
+# Activate the virtual environment
 .\venv\Scripts\activate
 
 # Install all dependencies
@@ -59,16 +77,11 @@ pip install openai groq pytest pytest-cov fastapi uvicorn streamlit pandas plotl
 
 ### API Keys Setup
 
-Create a `.env` file in the project root and in `src/extension/pythonTestingPipeline/scripts/`:
+1. Copy `.env.example` to `.env`.
+2. Add your API keys to the `.env` file.
 
-```env
-# Primary API key
-GROQ_API_KEY=your_groq_key_here
-
-# Or use OpenAI
-OPENAI_API_KEY=your_openai_key_here
-
-# Additional API keys (optional, for fallback)
-GROQ_API_KEY_1=your_second_key
-GROQ_API_KEY_2=your_third_key
+```bash
+cp .env.example .env
 ```
+
+**Note**: The `.env` file **must** be present in `src/extension/pythonTestingPipeline/scripts/` for the Python pipeline to function correctly, as the configuration loader looks for it there. Placing it in the root is recommended for consistency and other tools.

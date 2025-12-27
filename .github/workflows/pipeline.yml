@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov customtkinter
+          pip install pytest pytest-cov customtkinter fastapi uvicorn httpx pydantic
 
       # 5. Run GUI Tests (with virtual display)
       - name: Run GUI Tests
@@ -43,7 +43,11 @@ jobs:
         working-directory: src/extension/pythonTestingPipeline/scripts
         run: python -m pytest pipeline/tests/test_agents.py -v --tb=short
 
-      # 7. Deploy (placeholder)
+      # 7. Run API Tests
+      - name: Run API Tests
+        run: python -m pytest src/extension/api/tests/test_api.py -v --tb=short
+
+      # 8. Deploy (placeholder)
       - name: Deploy
         if: github.ref == 'refs/heads/main'
         run: echo "All tests passed - ready for deployment"
