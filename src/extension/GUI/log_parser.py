@@ -17,6 +17,7 @@ class ParseResult:
     security_issues: Optional[str] = None
     security_severity: Optional[str] = None  # "none", "low", or count
     agent_activation: Optional[int] = None  # 1, 2, or 3
+    iteration_data: Optional[tuple[int, float]] = None  # (iteration_num, time_seconds)
 
 
 class LogParser:
@@ -48,6 +49,7 @@ class LogParser:
     SECURITY_FOUND_PATTERN = re.compile(r"Security issues found:\s*(\d+)")
     SECURITY_MINOR_PATTERN = re.compile(r"Minor security issues.*?:\s*(\d+)")
     SECURITY_SEVERE_PATTERN = re.compile(r"Severe security issues:\s*(\w+)")
+    ITERATION_PATTERN = re.compile(r"Total time:\s*([\d.]+)s\s*\((\d+)\s*iteration")
 
     # Agent activation patterns
     AGENT_PATTERNS = [
@@ -104,5 +106,10 @@ class LogParser:
             if match := pattern.search(line):
                 extractor(match)
                 break
+
+        # Extract iteration data
+        if match := self.ITERATION_PATTERN.search(line):
+            time_sec, iteration = float(match.group(1)), int(match.group(2))
+            result.iteration_data = (iteration, time_sec)
 
         return result

@@ -1,45 +1,27 @@
-"""Performance graph widget for displaying metrics over iterations."""
+"""Performance graph widget for displaying coverage and time over iterations."""
 
 import customtkinter as ctk
 from ..theme import COLORS
 
-# Try to import matplotlib for the graph
 try:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
     from matplotlib.figure import Figure
 
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
-    FigureCanvasTkAgg = None
-    Figure = None
+    FigureCanvasTkAgg = Figure = None
     MATPLOTLIB_AVAILABLE = False
 
 
 class PerformanceGraph(ctk.CTkFrame):
-    """Line chart showing coverage, security, and time over iterations."""
-
-    LINES = [
-        ("coverage_data", COLORS["accent_green"], "Coverage"),
-        ("security_data", COLORS["accent_blue"], "Security"),
-        ("time_data", COLORS["accent_red"], "Time (s)"),
-    ]
+    """Dual-axis chart: Coverage % (left), Time seconds (right)."""
 
     def __init__(self, master, **kwargs):
         super().__init__(master, fg_color=COLORS["bg_card"], corner_radius=12, **kwargs)
-        self._init_data()
+        self.data = []
         self._build_ui()
 
-    def _init_data(self):
-        """Initialize data arrays."""
-        self.iterations, self.coverage_data, self.security_data, self.time_data = (
-            [],
-            [],
-            [],
-            [],
-        )
-
     def _build_ui(self):
-        """Build the graph UI."""
         ctk.CTkLabel(
             self,
             text="Performance Over Iterations",
@@ -47,87 +29,136 @@ class PerformanceGraph(ctk.CTkFrame):
             text_color=COLORS["text_secondary"],
         ).pack(anchor="w", padx=16, pady=(16, 8))
 
-        if MATPLOTLIB_AVAILABLE:
-            self._setup_matplotlib()
-        else:
-            self._setup_fallback()
+        if not MATPLOTLIB_AVAILABLE:
+            ctk.CTkLabel(
+                self,
+                text="📊 pip install matplotlib",
+                font=ctk.CTkFont(size=11),
+                text_color=COLORS["text_muted"],
+            ).pack(expand=True, pady=20)
+            return
 
-    def _setup_matplotlib(self):
-        """Setup matplotlib graph."""
-        self.fig = Figure(figsize=(4, 2.5), dpi=100, facecolor=COLORS["bg_card"])
+        self.fig = Figure(figsize=(5, 2.2), dpi=100, facecolor=COLORS["bg_card"])
         self.ax = self.fig.add_subplot(111)
-        self._style_axes()
+        self.ax2 = self.ax.twinx()
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.get_tk_widget().pack(
-            fill="both", expand=True, padx=16, pady=(0, 16)
+            fill="both", expand=True, padx=16, pady=(0, 12)
         )
+        self._refresh()
 
     def _style_axes(self):
-        """Apply dark theme to axes."""
-        self.ax.set_facecolor(COLORS["bg_card"])
-        self.ax.tick_params(colors=COLORS["text_muted"], labelsize=8)
-        for spine in ["bottom", "left"]:
-            self.ax.spines[spine].set_color(COLORS["border"])
-        for spine in ["top", "right"]:
-            self.ax.spines[spine].set_visible(False)
+        """Apply styling to both axes."""
+        bg = COLORS["bg_card"]
+        self.ax.set_facecolor(bg)
+        self.ax2.set_facecolor(bg)
+
+        # Hide all spines except needed ones
+        for spine in self.ax.spines.values():
+            spine.set_visible(False)
+        for spine in self.ax2.spines.values():
+            spine.set_visible(False)
+
+        # Left axis (Coverage) - green
+        self.ax.spines["left"].set_visible(True)
+        self.ax.spines["left"].set_color(COLORS["accent_green"])
+        self.ax.spines["bottom"].set_visible(True)
+        self.ax.spines["bottom"].set_color(COLORS["border"])
+        self.ax.tick_params(axis="y", colors=COLORS["accent_green"], labelsize=8)
+        self.ax.tick_params(axis="x", colors=COLORS["text_muted"], labelsize=8)
+        self.ax.set_ylabel("Coverage %", color=COLORS["accent_green"], fontsize=9)
         self.ax.set_xlabel("Iteration", color=COLORS["text_muted"], fontsize=9)
-        self.ax.set_ylabel("Value", color=COLORS["text_muted"], fontsize=9)
+        self.ax.set_ylim(0, 105)
 
-    def _setup_fallback(self):
-        """Fallback when matplotlib unavailable."""
-        ctk.CTkLabel(
-            self,
-            text="📊 Install matplotlib for graphs\npip install matplotlib",
-            font=ctk.CTkFont(size=11),
-            text_color=COLORS["text_muted"],
-        ).pack(expand=True, pady=20)
+        # Right axis (Time) - red
+        self.ax2.spines["right"].set_visible(True)
+        self.ax2.spines["right"].set_color(COLORS["accent_red"])
+        self.ax2.tick_params(axis="y", colors=COLORS["accent_red"], labelsize=8)
+        self.ax2.yaxis.set_label_position("right")
+        self.ax2.yaxis.tick_right()
+        self.ax2.set_ylabel(
+            "Time (s)",
+            color=COLORS["accent_red"],
+            fontsize=9,
+            rotation=270,
+            labelpad=12,
+        )
 
-    @staticmethod
-    def _clamp(val, typ, min_v=0, max_v=None):
-        """Validate and clamp a value to type and range."""
-        try:
-            val = typ(val) if val is not None else typ()
-        except (TypeError, ValueError):
-            val = typ()
-        val = max(min_v, val)
-        return min(max_v, val) if max_v is not None else val
-
-    def add_data_point(
-        self, iteration: int, coverage: float, security: int, exec_time: float
-    ):
-        """Add a data point and refresh."""
-        self.iterations.append(self._clamp(iteration, int))
-        self.coverage_data.append(self._clamp(coverage, float, 0, 100))
-        self.security_data.append(self._clamp(security, int))
-        self.time_data.append(self._clamp(exec_time, float))
+    def add_point(self, iteration: int, coverage: float, exec_time: float = 0.0):
+        """Add or update a data point."""
+        coverage, exec_time = max(0, min(100, coverage)), max(0, exec_time)
+        for i, (it, _, _) in enumerate(self.data):
+            if it == iteration:
+                self.data[i] = (iteration, coverage, exec_time)
+                break
+        else:
+            self.data.append((iteration, coverage, exec_time))
+        self.data.sort(key=lambda x: x[0])
         if MATPLOTLIB_AVAILABLE:
             self._refresh()
 
     def _refresh(self):
-        """Redraw the graph."""
         self.ax.clear()
+        self.ax2.clear()
         self._style_axes()
-        if self.iterations:
-            for attr, color, label in self.LINES:
-                self.ax.plot(
-                    self.iterations,
-                    getattr(self, attr),
-                    color=color,
-                    label=label,
-                    linewidth=2,
-                )
-            self.ax.legend(
-                loc="upper left",
-                fontsize=7,
-                facecolor=COLORS["bg_card"],
-                edgecolor=COLORS["border"],
-                labelcolor=COLORS["text_secondary"],
-            )
+
+        if not self.data:
+            self.ax.set_xlim(0, 1)
+            self.ax.set_xticks([])
+            self.fig.tight_layout()
+            self.canvas.draw()
+            return
+
+        iters, covs, times = zip(*self.data)
+
+        # Plot coverage (green, left)
+        self.ax.plot(
+            iters,
+            covs,
+            color=COLORS["accent_green"],
+            lw=2,
+            marker="o",
+            ms=5,
+            label="Coverage %",
+        )
+        self.ax.fill_between(iters, covs, alpha=0.15, color=COLORS["accent_green"])
+
+        # Plot time (red, right)
+        self.ax2.plot(
+            iters,
+            times,
+            color=COLORS["accent_red"],
+            lw=2,
+            marker="^",
+            ms=5,
+            label="Time (s)",
+        )
+        self.ax2.fill_between(iters, times, alpha=0.15, color=COLORS["accent_red"])
+
+        # X-axis: integer ticks only
+        self.ax.set_xticks(list(iters))
+        if len(iters) == 1:
+            self.ax.set_xlim(iters[0] - 0.5, iters[0] + 0.5)
+        else:
+            self.ax.set_xlim(min(iters) - 0.3, max(iters) + 0.3)
+
+        # Combined legend
+        h1, l1 = self.ax.get_legend_handles_labels()
+        h2, l2 = self.ax2.get_legend_handles_labels()
+        self.ax.legend(
+            h1 + h2,
+            l1 + l2,
+            loc="lower right",
+            fontsize=7,
+            facecolor=COLORS["bg_card"],
+            edgecolor=COLORS["border"],
+            labelcolor=COLORS["text_secondary"],
+        )
+
         self.fig.tight_layout()
         self.canvas.draw()
 
     def reset(self):
-        """Clear all data."""
-        self._init_data()
+        self.data = []
         if MATPLOTLIB_AVAILABLE:
             self._refresh()

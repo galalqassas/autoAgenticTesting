@@ -72,7 +72,7 @@ python -m venv venv
 pip install -r requirements.txt
 
 # Or install manually
-pip install openai groq pytest pytest-cov fastapi uvicorn streamlit pandas plotly matplotlib customtkinter python-dotenv
+pip install groq pytest pytest-cov fastapi uvicorn matplotlib customtkinter python-dotenv
 ```
 
 ### API Keys Setup

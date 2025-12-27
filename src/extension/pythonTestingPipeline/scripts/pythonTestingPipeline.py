@@ -94,14 +94,119 @@ class PythonTestingPipeline:
         print(f"   Prompts saved: {prompts_file}")
         return prompts_file
 
+    def generate_report(
+        self, results: dict, output_dir: Path, run_id: str = None
+    ) -> Path:
+        """Generates a concise markdown report with LLM summary."""
+        run_id = run_id or time_module.strftime("%Y%m%d_%H%M%S")
+        report_file = output_dir / f"report_{run_id}.md"
+
+        # Prepare data for LLM summary
+        eval_data = results.get("evaluation", {})
+        summary_data = eval_data.get("execution_summary", {})
+        coverage = eval_data.get("code_coverage_percentage", 0)
+        security = eval_data.get("security_issues", [])
+        scenarios = results.get("approved_scenarios", {}).get("test_scenarios", [])
+
+        # Generate LLM summary
+        summary_prompt = f"""Summarize this test run in 2-3 sentences:
+- Tests: {summary_data.get("passed", 0)}/{summary_data.get("total_tests", 0)} passed
+- Coverage: {coverage:.1f}%
+- Security issues: {len(security)}
+- Scenarios tested: {len(scenarios)}
+Be concise and professional."""
+
+        try:
+            llm_summary, _ = self.llm_client.call(
+                sys_p="You are a concise technical writer. Summarize test results.",
+                usr_p=summary_prompt,
+            )
+        except Exception:
+            llm_summary = f"Test run completed with {coverage:.1f}% coverage."
+
+        # Build markdown report
+        status_icon = "✅" if results.get("status") == "completed" else "❌"
+        report = f"""# Test Pipeline Report
+
+**Status:** {status_icon} {results.get("status", "unknown").upper()}  
+**Generated:** {time_module.strftime("%Y-%m-%d %H:%M:%S")}  
+**Model:** {self.model}
+
+## Summary
+
+{llm_summary}
+
+## Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tests | {summary_data.get("total_tests", 0)} |
+| Passed | {summary_data.get("passed", 0)} |
+| Failed | {summary_data.get("failed", 0)} |
+| Coverage | {coverage:.1f}% |
+| Security Issues | {len(security)} |
+"""
+
+        # Add security section if issues exist
+        if security:
+            report += "\n## Security Issues\n\n"
+            for issue in security[:5]:  # Limit to top 5
+                sev = (
+                    issue.get("severity", "unknown")
+                    if isinstance(issue, dict)
+                    else getattr(issue, "severity", "unknown")
+                )
+                # Use 'issue' field (model) or fallback to 'description'
+                desc = (
+                    issue.get("issue", issue.get("description", ""))
+                    if isinstance(issue, dict)
+                    else getattr(issue, "issue", getattr(issue, "description", ""))
+                )
+                loc = (
+                    issue.get("location", "")
+                    if isinstance(issue, dict)
+                    else getattr(issue, "location", "")
+                )
+                report += f"- **[{sev.upper()}]** {desc}"
+                if loc:
+                    report += f" (`{loc}`)"
+                report += "\n"
+
+        # Add timing section
+        timing = results.get("timing", {})
+        if timing:
+            total_secs = timing.get("total_seconds", 0)
+            iter_times = timing.get("iteration_times", [])
+            report += "\n## Timing\n\n"
+            report += "| Phase | Duration |\n|-------|----------|\n"
+            report += f"| Total Pipeline | {total_secs:.1f}s |\n"
+            if iter_times:
+                for i, t in enumerate(iter_times, 1):
+                    report += f"| Iteration {i} | {t:.1f}s |\n"
+
+        # Add test file location
+        if results.get("test_file"):
+            report += f"\n## Output\n\n- Test file: `{results['test_file']}`\n"
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        with open(report_file, "w", encoding="utf-8") as f:
+            f.write(report)
+
+        print(f"   Report saved: {report_file}")
+        return report_file
+
     def identify_test_scenarios(self, codebase_path: Path) -> TestScenariosOutput:
         """Agent 1: Identifies test scenarios from the codebase using parallel processing."""
         return self.identification_agent.run(codebase_path)
 
-    def interpret_user_input(self, user_input: str, scenarios: TestScenariosOutput) -> dict:
+    def interpret_user_input(
+        self, user_input: str, scenarios: TestScenariosOutput
+    ) -> dict:
         """Uses LLM to interpret user input and determine action."""
-        scenario_list = "\n".join(f"{i+1}. [{s.priority}] {s.scenario_description}" 
-                                   for i, s in enumerate(scenarios.test_scenarios))
+        scenario_list = "\n".join(
+            f"{i + 1}. [{s.priority}] {s.scenario_description}"
+            for i, s in enumerate(scenarios.test_scenarios)
+        )
         prompt = f"""Scenarios:\n{scenario_list}\n\nUser said: "{user_input}"
 
 Determine intent. Return JSON:
@@ -109,27 +214,44 @@ Determine intent. Return JSON:
         try:
             response, _ = self.llm_client.call(
                 sys_p="Interpret user intent for test scenario approval. Return only valid JSON.",
-                usr_p=prompt
+                usr_p=prompt,
             )
             match = re.search(r"\{[^{}]*\}", response)
             if match:
                 return json.loads(match.group())
         except Exception:
             pass
-        return {"action": "refine", "feedback": user_input}  # Default: treat as feedback
+        return {
+            "action": "refine",
+            "feedback": user_input,
+        }  # Default: treat as feedback
 
-    def refine_scenarios(self, scenarios: TestScenariosOutput, feedback: str) -> TestScenariosOutput:
+    def refine_scenarios(
+        self, scenarios: TestScenariosOutput, feedback: str
+    ) -> TestScenariosOutput:
         """Uses LLM to refine scenarios based on feedback."""
-        current = "\n".join(f"- [{s.priority}] {s.scenario_description}" for s in scenarios.test_scenarios)
-        prompt = f"Scenarios:\n{current}\n\nFeedback: {feedback}\n\nReturn refined JSON: {{\"test_scenarios\": [{{\"priority\": \"High/Medium/Low\", \"scenario_description\": \"...\"}}]}}"
+        current = "\n".join(
+            f"- [{s.priority}] {s.scenario_description}"
+            for s in scenarios.test_scenarios
+        )
+        prompt = f'Scenarios:\n{current}\n\nFeedback: {feedback}\n\nReturn refined JSON: {{"test_scenarios": [{{"priority": "High/Medium/Low", "scenario_description": "..."}}]}}'
         try:
-            response, _ = self.llm_client.call(sys_p="Refine test scenarios. Return valid JSON only.", usr_p=prompt)
+            response, _ = self.llm_client.call(
+                sys_p="Refine test scenarios. Return valid JSON only.", usr_p=prompt
+            )
             match = re.search(r"\{[\s\S]*\}", response)
             if match:
                 data = json.loads(match.group())
                 from pipeline.models import TestScenario
-                new = [TestScenario(priority=s.get("priority", "Medium"), scenario_description=s["scenario_description"])
-                       for s in data.get("test_scenarios", []) if "scenario_description" in s]
+
+                new = [
+                    TestScenario(
+                        priority=s.get("priority", "Medium"),
+                        scenario_description=s["scenario_description"],
+                    )
+                    for s in data.get("test_scenarios", [])
+                    if "scenario_description" in s
+                ]
                 if new:
                     print(f"   Refined to {len(new)} scenarios")
                     return TestScenariosOutput(test_scenarios=new)
@@ -139,6 +261,7 @@ Determine intent. Return JSON:
 
     def request_approval(self, scenarios: TestScenariosOutput) -> TestScenariosOutput:
         """Natural language approval flow using LLM interpretation."""
+
         def display(scens):
             print("\n" + "=" * 60)
             print("TEST SCENARIOS FOR REVIEW")
@@ -146,7 +269,9 @@ Determine intent. Return JSON:
             for i, s in enumerate(scens.test_scenarios, 1):
                 icon = {"High": "!", "Medium": "~", "Low": "."}.get(s.priority, " ")
                 print(f"  {i}. [{icon}] {s.scenario_description}")
-            print(f"\n  Total: {len(scens.test_scenarios)} | Type anything to proceed or provide feedback")
+            print(
+                f"\n  Total: {len(scens.test_scenarios)} | Type anything to proceed or provide feedback"
+            )
             print("-" * 60)
 
         display(scenarios)
@@ -156,17 +281,25 @@ Determine intent. Return JSON:
                 continue
             intent = self.interpret_user_input(user_input, scenarios)
             action = intent.get("action", "refine")
-            
+
             if action == "approve":
                 print("Approved!")
                 return scenarios
             elif action == "remove":
-                indices = {int(i) - 1 for i in intent.get("indices", []) if isinstance(i, int)}
-                scenarios.test_scenarios = [s for i, s in enumerate(scenarios.test_scenarios) if i not in indices]
+                indices = {
+                    int(i) - 1 for i in intent.get("indices", []) if isinstance(i, int)
+                }
+                scenarios.test_scenarios = [
+                    s
+                    for i, s in enumerate(scenarios.test_scenarios)
+                    if i not in indices
+                ]
                 print(f"   Removed {len(indices)} scenario(s)")
                 display(scenarios)
             else:  # refine
-                scenarios = self.refine_scenarios(scenarios, intent.get("feedback", user_input))
+                scenarios = self.refine_scenarios(
+                    scenarios, intent.get("feedback", user_input)
+                )
                 display(scenarios)
 
     def generate_test_code(
@@ -248,6 +381,10 @@ Determine intent. Return JSON:
         output_dir = output_dir or codebase_path / "tests"
         results = {"status": "started"}
 
+        # Start total pipeline timer
+        pipeline_start_time = time_module.time()
+        iteration_times = []
+
         try:
             # Step 1: Identify scenarios
             scenarios = self.identify_test_scenarios(codebase_path)
@@ -291,6 +428,7 @@ Determine intent. Return JSON:
 
                 while iteration < max_iterations:
                     iteration += 1
+                    iteration_start = time_module.time()
                     print(f"\n--- Iteration {iteration} ---")
 
                     # Run tests with coverage
@@ -328,6 +466,9 @@ Determine intent. Return JSON:
                                 print(
                                     f"   ℹ️  Minor security issues (low/medium): {len(low_med)}"
                                 )
+                        iteration_time = time_module.time() - iteration_start
+                        iteration_times.append(iteration_time)
+                        print(f"   ⏱️  Iteration time: {iteration_time:.1f}s")
                         break
 
                     # Check for progress
@@ -413,6 +554,11 @@ Determine intent. Return JSON:
                     if new_deps:
                         install_dependencies(new_deps, codebase_path)
 
+                    # Record iteration time
+                    iteration_time = time_module.time() - iteration_start
+                    iteration_times.append(iteration_time)
+                    print(f"   ⏱️  Iteration time: {iteration_time:.1f}s")
+
                 else:
                     # Reached max iterations without meeting targets
                     print(f"\n⚠️ Max iterations ({max_iterations}) reached")
@@ -434,12 +580,24 @@ Determine intent. Return JSON:
                         f.write(best_test_code)
                     current_test_code = best_test_code
 
+            # Calculate total time
+            total_time = time_module.time() - pipeline_start_time
+            results["timing"] = {
+                "total_seconds": round(total_time, 2),
+                "iteration_times": [round(t, 2) for t in iteration_times],
+                "iterations_count": len(iteration_times),
+            }
             results["status"] = "completed"
 
             # Save all prompts to JSON for later analysis
-            prompts_file = self.save_prompts(output_dir, str(int(time_module.time())))
+            run_id = str(int(time_module.time()))
+            prompts_file = self.save_prompts(output_dir, run_id)
             results["prompts_file"] = str(prompts_file)
             results["total_prompts"] = len(self.prompt_history)
+
+            # Generate markdown report with LLM summary
+            report_file = self.generate_report(results, output_dir, run_id)
+            results["report_file"] = str(report_file)
 
             # Print summary
             print("\n" + "=" * 60)
@@ -455,6 +613,10 @@ Determine intent. Return JSON:
                 print(f"   Coverage: {eval_data['code_coverage_percentage']:.1f}%")
 
             print(f"   Prompts used: {len(self.prompt_history)}")
+            print(
+                f"   Total time: {total_time:.1f}s ({len(iteration_times)} iteration(s))"
+            )
+            print(f"   Report: {report_file}")
 
         except Exception as e:
             results["status"] = "failed"

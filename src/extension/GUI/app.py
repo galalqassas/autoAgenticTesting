@@ -4,6 +4,7 @@ A modern, minimalistic GUI for the Python Testing Pipeline.
 """
 
 import logging
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from tkinter import filedialog
@@ -12,11 +13,11 @@ import customtkinter as ctk
 
 from .theme import COLORS
 from .widgets import (
-    PhaseStep,
     StatsCard,
     PerformanceGraph,
     AgentFlow,
     ConversationViewer,
+    ReportViewer,
 )
 from .log_parser import LogParser
 from .pipeline_runner import PipelineRunner
@@ -48,6 +49,8 @@ class PipelineGUI(ctk.CTk):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         self.configure(fg_color=COLORS["bg_dark"])
+        self.bind("<Control-Return>", lambda e: self._toggle_pipeline())
+        self.bind("<Control-o>", lambda e: self._browse_path())
 
     def _init_components(self):
         """Initialize non-UI components."""
@@ -61,6 +64,8 @@ class PipelineGUI(ctk.CTk):
         self.parser = LogParser()
         self.stats_cards = {}
         self.latest_prompts_file = None  # Track prompts file from pipeline
+        self.latest_report_file = None  # Track report file from pipeline
+        self._graph_iteration = 0  # Track iterations for graph
 
     def _build_ui(self):
         """Build the complete UI."""
@@ -169,6 +174,9 @@ class PipelineGUI(ctk.CTk):
         # Prompts tab content
         self.prompts_frame = ConversationViewer(self.content_container)
 
+        # Report tab content
+        self.report_frame = ReportViewer(self.content_container)
+
         # Show pipeline tab by default
         self.current_tab = "pipeline"
         self._show_tab("pipeline")
@@ -214,6 +222,20 @@ class PipelineGUI(ctk.CTk):
         )
         self.tab_buttons["prompts"].pack(side="left", padx=(0, 4))
 
+        # Report tab button
+        self.tab_buttons["report"] = ctk.CTkButton(
+            tab_inner,
+            text="📊 Report",
+            width=120,
+            height=32,
+            fg_color=COLORS["bg_dark"],
+            hover_color=COLORS["border"],
+            font=ctk.CTkFont(size=13),
+            corner_radius=8,
+            command=lambda: self._show_tab("report"),
+        )
+        self.tab_buttons["report"].pack(side="left", padx=(0, 4))
+
     def _show_tab(self, tab_name: str):
         """Switch to the specified tab."""
         self.current_tab = tab_name
@@ -221,6 +243,7 @@ class PipelineGUI(ctk.CTk):
         # Hide all frames
         self.pipeline_frame.pack_forget()
         self.prompts_frame.pack_forget()
+        self.report_frame.pack_forget()
 
         # Update button styles
         for name, btn in self.tab_buttons.items():
@@ -240,6 +263,8 @@ class PipelineGUI(ctk.CTk):
             self.pipeline_frame.pack(fill="both", expand=True)
         elif tab_name == "prompts":
             self.prompts_frame.pack(fill="both", expand=True)
+        elif tab_name == "report":
+            self.report_frame.pack(fill="both", expand=True)
 
     def _build_stepper(self, parent):
         """Build the agent flow stepper."""
@@ -357,6 +382,7 @@ class PipelineGUI(ctk.CTk):
             return
 
         self._reset_ui()
+        self._pipeline_start_time = time.time()
         cmd = f"🚀 Starting pipeline: python {self.runner.script_path} {target}"
         if self.auto_approve.get():
             cmd += " --auto-approve"
@@ -400,6 +426,14 @@ class PipelineGUI(ctk.CTk):
                 if path.endswith(".json"):
                     self.latest_prompts_file = path
 
+        # Detect report file from pipeline output
+        if "Report saved:" in line or "Report:" in line:
+            parts = line.split(":", 1)
+            if len(parts) > 1:
+                path = parts[-1].strip().rstrip('"').lstrip('"')
+                if path.endswith(".md"):
+                    self.latest_report_file = path
+
         if result.phase_update:
             phase, state = result.phase_update
             self.update_idletasks()
@@ -407,10 +441,15 @@ class PipelineGUI(ctk.CTk):
         if result.agent_activation:
             self.agent_flow.add_agent(result.agent_activation)
 
+        # Update performance graph when we have new metrics
+        # Track if we got new data worth graphing
+        should_update_graph = False
+
         if result.coverage:
             self.stats_cards["coverage"].update_stats(
                 f"{result.coverage}%", "Lines covered"
             )
+            should_update_graph = True
 
         if result.tests:
             passed, total, failed = result.tests
@@ -437,6 +476,16 @@ class PipelineGUI(ctk.CTk):
                 label,
             )
 
+        # Update graph only when coverage changes
+        if should_update_graph:
+            self._graph_iteration += 1
+            try:
+                coverage = float(result.coverage)
+            except (ValueError, TypeError):
+                coverage = 0.0
+            elapsed = time.time() - getattr(self, "_pipeline_start_time", time.time())
+            self.graph.add_point(self._graph_iteration, coverage, elapsed)
+
     def _on_complete(self):
         """Handle pipeline completion."""
         self.after(0, self._finalize)
@@ -460,8 +509,17 @@ class PipelineGUI(ctk.CTk):
                 self.prompts_frame.load_file(self.latest_prompts_file)
                 self.prompts_frame.file_entry.delete(0, "end")
                 self.prompts_frame.file_entry.insert(0, self.latest_prompts_file)
-                self._show_tab("prompts")  # Switch to prompts tab
             self.latest_prompts_file = None  # Reset for next run
+
+        # Auto-load report file if available
+        if self.latest_report_file:
+            if Path(self.latest_report_file).exists():
+                self._log(f"\n📊 Loading report: {self.latest_report_file}\n")
+                self.report_frame.load_file(self.latest_report_file)
+                self.report_frame.file_entry.delete(0, "end")
+                self.report_frame.file_entry.insert(0, self.latest_report_file)
+                self._show_tab("report")  # Switch to report tab
+            self.latest_report_file = None  # Reset for next run
 
     # ==================== Helpers ====================
     def _reset_ui(self):
@@ -470,7 +528,9 @@ class PipelineGUI(ctk.CTk):
         for name, value, subtext, _ in self.STATS:
             self.stats_cards[name.lower()].update_stats(value, subtext)
         self.graph.reset()
+        self.report_frame.reset()
         self._clear_log()
+        self._graph_iteration = 0  # Track iterations for graph
 
     @contextmanager
     def _log_editable(self):

@@ -76,6 +76,9 @@ class TestPipelineGUIMethods:
                         gui.graph = Mock()
                         gui.agent_flow = Mock()
                         gui.latest_prompts_file = None
+                        gui.latest_report_file = None
+                        gui._graph_iteration = 0
+                        gui._pipeline_start_time = 0
                         gui.after = Mock(side_effect=lambda t, f: f())
                         return gui
 

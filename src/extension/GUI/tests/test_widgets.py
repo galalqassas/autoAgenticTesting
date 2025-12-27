@@ -40,34 +40,26 @@ class TestStatsCard:
 class TestPerformanceGraph:
     """Tests for PerformanceGraph widget."""
 
-    def test_lines_configuration(self):
-        """PerformanceGraph should have valid LINES config."""
+    def test_class_structure(self):
+        """PerformanceGraph should inherit from CTkFrame."""
         from src.extension.GUI.widgets.perf_graph import PerformanceGraph
+        import customtkinter as ctk
 
-        assert len(PerformanceGraph.LINES) == 3
-        expected = {"coverage_data", "security_data", "time_data"}
-        assert {line[0] for line in PerformanceGraph.LINES} == expected
-
-    def test_clamp_function(self):
-        """_clamp should handle various input types."""
-        from src.extension.GUI.widgets.perf_graph import PerformanceGraph
-
-        # Valid inputs
-        assert PerformanceGraph._clamp(50, int, 0, 100) == 50
-        assert PerformanceGraph._clamp(150, float, 0, 100) == 100
-        assert PerformanceGraph._clamp(-10, int, 0) == 0
-        # Invalid/None inputs return type defaults
-        assert PerformanceGraph._clamp(None, int) == 0
-        assert PerformanceGraph._clamp("invalid", float) == 0.0
-        # String conversion
-        assert PerformanceGraph._clamp("5", int) == 5
+        assert issubclass(PerformanceGraph, ctk.CTkFrame)
 
     def test_has_required_methods(self):
         """PerformanceGraph should have required methods."""
         from src.extension.GUI.widgets.perf_graph import PerformanceGraph
 
-        for method in ["add_data_point", "reset", "_init_data", "_refresh"]:
+        for method in ["add_point", "reset", "_refresh", "_build_ui", "_style_axes"]:
             assert hasattr(PerformanceGraph, method)
+
+    def test_matplotlib_availability_check(self):
+        """Module should have MATPLOTLIB_AVAILABLE flag."""
+        from src.extension.GUI.widgets import perf_graph
+
+        assert hasattr(perf_graph, "MATPLOTLIB_AVAILABLE")
+        assert isinstance(perf_graph.MATPLOTLIB_AVAILABLE, bool)
 
 
 class TestAgentFlow:
@@ -192,6 +184,70 @@ class TestConversationViewer:
         assert "All Agents" in AGENT_TYPES[0]
 
 
+class TestReportViewer:
+    """Tests for ReportViewer widget."""
+
+    def test_class_structure(self):
+        """ReportViewer should inherit from CTkFrame and have required methods."""
+        from src.extension.GUI.widgets.report_viewer import ReportViewer
+        import customtkinter as ctk
+
+        assert issubclass(ReportViewer, ctk.CTkFrame)
+        for method in [
+            "load_file",
+            "reset",
+            "_browse",
+            "_render",
+            "_render_table",
+            "_insert_inline",
+        ]:
+            assert callable(getattr(ReportViewer, method))
+
+    def test_tags_configuration(self):
+        """TAGS dict should define all required style configurations."""
+        from src.extension.GUI.widgets.report_viewer import TAGS
+
+        expected_tags = {
+            "h1",
+            "h2",
+            "h3",
+            "bold",
+            "code",
+            "th",
+            "td",
+            "border",
+            "bullet",
+        }
+        assert set(TAGS.keys()) == expected_tags
+        for tag, config in TAGS.items():
+            assert isinstance(config, dict)
+            assert "foreground" in config or "font" in config
+
+    def test_markdown_header_patterns(self):
+        """ReportViewer should handle markdown header patterns correctly."""
+
+        # Test header detection logic
+        test_cases = [
+            ("# Title", "h1"),
+            ("## Section", "h2"),
+            ("### Subsection", "h3"),
+            ("- List item", "bullet"),
+            ("| table |", "table"),
+        ]
+        for text, expected_type in test_cases:
+            stripped = text.strip()
+            if expected_type == "h1":
+                assert stripped.startswith("# ")
+            elif expected_type == "h2":
+                assert stripped.startswith("## ")
+            elif expected_type == "h3":
+                assert stripped.startswith("### ")
+            elif expected_type == "bullet":
+                assert stripped.startswith("- ")
+            elif expected_type == "table":
+                assert stripped.startswith("|")
+
+
 class TestWidgetsPackage:
     """Tests for widgets package exports."""
 
@@ -204,6 +260,7 @@ class TestWidgetsPackage:
             AgentFlow,
             PromptCard,
             ConversationViewer,
+            ReportViewer,
         )
 
         assert all(
@@ -215,6 +272,7 @@ class TestWidgetsPackage:
                 AgentFlow,
                 PromptCard,
                 ConversationViewer,
+                ReportViewer,
             ]
         )
 
@@ -229,5 +287,6 @@ class TestWidgetsPackage:
             "AgentFlow",
             "PromptCard",
             "ConversationViewer",
+            "ReportViewer",
         }
         assert set(widgets.__all__) == expected

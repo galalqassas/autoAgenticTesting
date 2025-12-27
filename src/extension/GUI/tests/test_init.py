@@ -1,7 +1,5 @@
 """Unit tests for GUI package initialization."""
 
-import pytest
-
 
 class TestPackageExports:
     """Tests for package exports."""
@@ -23,6 +21,7 @@ class TestPackageExports:
             AgentFlow,
             PromptCard,
             ConversationViewer,
+            ReportViewer,
         )
         import src.extension.GUI.widgets as widgets
 
@@ -35,6 +34,7 @@ class TestPackageExports:
                 AgentFlow,
                 PromptCard,
                 ConversationViewer,
+                ReportViewer,
             ]
         )
         assert set(widgets.__all__) == {
@@ -44,4 +44,5 @@ class TestPackageExports:
             "AgentFlow",
             "PromptCard",
             "ConversationViewer",
+            "ReportViewer",
         }
