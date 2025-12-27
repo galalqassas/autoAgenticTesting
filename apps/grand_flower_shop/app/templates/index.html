@@ -1,0 +1,37 @@
+{% extends "base.html" %} {% block content %}
+<section class="hero">
+  <h2>🌺 Welcome to Grand Flower Shop</h2>
+  <p>Exquisite blooms delivered around the globe</p>
+  <a
+    href="/products"
+    class="btn"
+    style="margin-top: 1rem; display: inline-block"
+    >Browse Our Collection</a
+  >
+</section>
+<section class="stats">
+  <div class="stat">
+    <strong>{{ product_count }}</strong>
+    <span>🌼 Beautiful Products</span>
+  </div>
+  <div class="stat">
+    <strong>{{ branch_count }}</strong>
+    <span>🌍 Global Branches</span>
+  </div>
+</section>
+<section
+  style="
+    background: #f3e8f7;
+    padding: 2rem;
+    border-radius: 8px;
+    margin: 2rem 0;
+    text-align: center;
+  "
+>
+  <h3 style="color: #8b4789">Why Choose Us?</h3>
+  <p>
+    ✨ Fresh flowers handpicked daily | 🚚 Fast worldwide shipping | 💚
+    Eco-friendly packaging | 💝 Perfect for any occasion
+  </p>
+</section>
+{% endblock %}

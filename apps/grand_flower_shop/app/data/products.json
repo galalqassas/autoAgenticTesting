@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "name": "Red Roses Bouquet",
+    "description": "A dozen premium long-stem red roses perfect for romance.",
+    "price": 49.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/rose.svg"
+  },
+  {
+    "id": 2,
+    "name": "Sunny Tulips Mix",
+    "description": "Cheerful mix of yellow and orange tulips to brighten any day.",
+    "price": 29.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/tulip.svg"
+  },
+  {
+    "id": 3,
+    "name": "White Orchid Pot",
+    "description": "Elegant phalaenopsis orchid in a ceramic pot.",
+    "price": 59.99,
+    "currency": "USD",
+    "category": "Plant",
+    "image_url": "/static/images/orchid.svg"
+  },
+  {
+    "id": 4,
+    "name": "Lavender Dreams",
+    "description": "Relaxing lavender and white flowers arrangement in a glass vase.",
+    "price": 44.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/lavender.svg"
+  },
+  {
+    "id": 5,
+    "name": "Sunflower Delight",
+    "description": "Bright sunflowers that radiate warmth and happiness.",
+    "price": 39.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/sunflower.svg"
+  },
+  {
+    "id": 6,
+    "name": "Cherry Blossom Mix",
+    "description": "Delicate pink cherry blossoms with soft greens.",
+    "price": 54.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/cherry-blossom.svg"
+  },
+  {
+    "id": 7,
+    "name": "Peony Paradise",
+    "description": "Lush peonies in soft pink and cream hues.",
+    "price": 69.99,
+    "currency": "USD",
+    "category": "Luxury",
+    "image_url": "/static/images/peony.svg"
+  },
+  {
+    "id": 8,
+    "name": "Gerbera Rainbow",
+    "description": "Colorful gerbera daisies in a vibrant mix of colors.",
+    "price": 34.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/gerbera.svg"
+  },
+  {
+    "id": 9,
+    "name": "Lilies & Roses",
+    "description": "Classic combination of white lilies and red roses.",
+    "price": 59.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/lilies.svg"
+  },
+  {
+    "id": 10,
+    "name": "Tropical Paradise",
+    "description": "Exotic birds of paradise, anthuriums, and tropical foliage.",
+    "price": 74.99,
+    "currency": "USD",
+    "category": "Luxury",
+    "image_url": "/static/images/tropical.svg"
+  },
+  {
+    "id": 11,
+    "name": "Garden Rose Elegance",
+    "description": "Premium garden roses in blush pink tones.",
+    "price": 64.99,
+    "currency": "USD",
+    "category": "Luxury",
+    "image_url": "/static/images/rose.svg"
+  },
+  {
+    "id": 12,
+    "name": "Iris Serenity",
+    "description": "Beautiful purple and blue irises with eucalyptus.",
+    "price": 42.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/lavender.svg"
+  },
+  {
+    "id": 13,
+    "name": "Dahlia Dream",
+    "description": "Full blooming dahlias in rich burgundy and blush.",
+    "price": 55.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/peony.svg"
+  },
+  {
+    "id": 14,
+    "name": "Ranunculus Romance",
+    "description": "Romantic ranunculus flowers in soft pastels.",
+    "price": 48.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/cherry-blossom.svg"
+  },
+  {
+    "id": 15,
+    "name": "Cactus Garden Pot",
+    "description": "Low-maintenance succulent cactus arrangement in ceramic.",
+    "price": 24.99,
+    "currency": "USD",
+    "category": "Plant",
+    "image_url": "/static/images/orchid.svg"
+  },
+  {
+    "id": 16,
+    "name": "Seasonal Spring Mix",
+    "description": "Fresh seasonal spring flowers in vibrant colors.",
+    "price": 39.99,
+    "currency": "USD",
+    "category": "Seasonal",
+    "image_url": "/static/images/gerbera.svg"
+  },
+  {
+    "id": 17,
+    "name": "Amaryllis Majesty",
+    "description": "Stunning large amaryllis flowers with elegant stems.",
+    "price": 45.99,
+    "currency": "USD",
+    "category": "Plant",
+    "image_url": "/static/images/lilies.svg"
+  },
+  {
+    "id": 18,
+    "name": "Hydrangea Heaven",
+    "description": "Gorgeous hydrangeas in blue, pink, and white.",
+    "price": 52.99,
+    "currency": "USD",
+    "category": "Bouquet",
+    "image_url": "/static/images/peony.svg"
+  },
+  {
+    "id": 19,
+    "name": "Baby's Breath Clouds",
+    "description": "Delicate and airy baby's breath filler flowers.",
+    "price": 19.99,
+    "currency": "USD",
+    "category": "Filler",
+    "image_url": "/static/images/tulip.svg"
+  },
+  {
+    "id": 20,
+    "name": "Midnight Romance",
+    "description": "Dark dramatic roses and black calla lilies for the bold.",
+    "price": 79.99,
+    "currency": "USD",
+    "category": "Luxury",
+    "image_url": "/static/images/rose.svg"
+  }
+]

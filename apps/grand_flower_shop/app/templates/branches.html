@@ -1,0 +1,15 @@
+{% extends "base.html" %} {% block content %}
+<h2>Our Branches</h2>
+<div class="grid">
+  {% for b in branches %}
+  <div class="card">
+    <h3>{{ b.name }} — {{ b.city }}, {{ b.country }}</h3>
+    <p>{{ b.address }}</p>
+    {% if b.phone %}
+    <p>Phone: {{ b.phone }}</p>
+    {% endif %} {% if b.timezone %}<span class="badge">{{ b.timezone }}</span>{%
+    endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

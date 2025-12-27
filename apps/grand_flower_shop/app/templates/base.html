@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Grand Flower Shop</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          "
+        >
+          <h1>🌸 Grand Flower Shop</h1>
+          <div class="cart-icon">
+            <a
+              href="/cart"
+              style="color: #fff; text-decoration: none; font-size: 1.5rem"
+              >🛒</a
+            >
+            <span class="cart-badge" id="cart-count">0</span>
+          </div>
+        </div>
+        <nav>
+          <a href="/">Home</a>
+          <a href="/products">Products</a>
+          <a href="/branches">Branches</a>
+          <a href="/cart">Cart</a>
+        </nav>
+      </div>
+    </header>
+    <main class="container">{% block content %}{% endblock %}</main>
+    <footer class="site-footer">
+      <div class="container">
+        &copy; {{ 2025 }} Grand Flower Shop. Blooming Worldwide.
+      </div>
+    </footer>
+    <script>
+      function updateCartBadge() {
+        fetch("/api/cart")
+          .then((r) => r.json())
+          .then((data) => {
+            const total = data.items.reduce(
+              (sum, item) => sum + item.quantity,
+              0
+            );
+            document.getElementById("cart-count").textContent = total;
+          });
+      }
+      updateCartBadge();
+      setInterval(updateCartBadge, 2000);
+    </script>
+  </body>
+</html>

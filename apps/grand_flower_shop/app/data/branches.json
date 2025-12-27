@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "name": "Central Bloom",
+    "country": "USA",
+    "city": "New York",
+    "address": "123 Fifth Ave, New York, NY",
+    "phone": "+1 212-555-0123",
+    "timezone": "America/New_York"
+  },
+  {
+    "id": 2,
+    "name": "Thames Petals",
+    "country": "UK",
+    "city": "London",
+    "address": "45 Flower St, London",
+    "phone": "+44 20 7946 1234",
+    "timezone": "Europe/London"
+  },
+  {
+    "id": 3,
+    "name": "Shibuya Blossoms",
+    "country": "Japan",
+    "city": "Tokyo",
+    "address": "2-11-1 Dogenzaka, Shibuya-ku, Tokyo",
+    "phone": "+81 3-1234-5678",
+    "timezone": "Asia/Tokyo"
+  }
+]

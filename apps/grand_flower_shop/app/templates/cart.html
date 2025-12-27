@@ -1,0 +1,106 @@
+{% extends "base.html" %} {% block content %}
+<h2 style="color: #8b4789">🛒 Your Shopping Cart</h2>
+
+{% if items %}
+<table style="width: 100%; border-collapse: collapse; margin: 2rem 0">
+  <thead>
+    <tr style="background: #f3e8f7; border-bottom: 2px solid #d946a6">
+      <th style="padding: 1rem; text-align: left">Product</th>
+      <th style="padding: 1rem; text-align: center">Price</th>
+      <th style="padding: 1rem; text-align: center">Quantity</th>
+      <th style="padding: 1rem; text-align: right">Subtotal</th>
+      <th style="padding: 1rem; text-align: center">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr style="border-bottom: 1px solid #e8d4e8">
+      <td style="padding: 1rem">{{ item.product_name }}</td>
+      <td style="padding: 1rem; text-align: center">
+        ${{ "%.2f"|format(item.price) }}
+      </td>
+      <td style="padding: 1rem; text-align: center">
+        <input
+          type="number"
+          min="1"
+          value="{{ item.quantity }}"
+          class="quantity-input"
+          onchange="updateQuantity('{{ item.product_id }}', this.value)"
+        />
+      </td>
+      <td style="padding: 1rem; text-align: right">
+        ${{ "%.2f"|format(item.price * item.quantity) }}
+      </td>
+      <td style="padding: 1rem; text-align: center">
+        <button class="remove-btn" onclick="removeItem('{{ item.product_id }}')">
+          Remove
+        </button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div
+  style="
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 2rem 0;
+  "
+>
+  <a href="/products" class="btn">Continue Shopping</a>
+  <div class="summary">
+    <h3>Order Summary</h3>
+    <p>Items: {{ items|length }}</p>
+    <p class="total">Total: ${{ "%.2f"|format(total) }}</p>
+    <button class="btn" style="width: 100%; margin-top: 1rem">
+      Proceed to Checkout
+    </button>
+    <button
+      class="btn"
+      style="width: 100%; margin-top: 0.5rem; background: #e74c3c"
+      onclick="clearCart()"
+    >
+      Clear Cart
+    </button>
+  </div>
+</div>
+{% else %}
+<p style="text-align: center; padding: 2rem; color: #7a5d7e">
+  Your cart is empty.
+  <a href="/products" style="color: #d946a6; font-weight: bold"
+    >Start shopping!</a
+  >
+</p>
+{% endif %}
+
+<script>
+  function updateQuantity(productId, quantity) {
+    fetch(`/api/cart/update/${productId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity: parseInt(quantity) }),
+    }).then(() => {
+      alert("Cart updated!");
+      location.reload();
+    });
+  }
+
+  function removeItem(productId) {
+    if (confirm("Remove this item from cart?")) {
+      fetch(`/api/cart/remove/${productId}`, { method: "DELETE" }).then(() => {
+        location.reload();
+      });
+    }
+  }
+
+  function clearCart() {
+    if (confirm("Clear the entire cart?")) {
+      fetch("/api/cart/clear", { method: "POST" }).then(() => {
+        location.reload();
+      });
+    }
+  }
+</script>
+{% endblock %}
