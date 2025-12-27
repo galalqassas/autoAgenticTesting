@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from llm_config import create_llm_client
-from pipeline.code_utils import sanitize_code, validate_syntax
+from pipeline.code_utils import sanitize_code, validate_syntax, detect_hallucinations
 from pipeline.file_utils import gather_python_files, read_file_contents_chunked
 from pipeline.models import (
     ExecutionSummary,
@@ -261,6 +261,26 @@ Generate a complete, executable PyTest file."""
         is_valid, error_msg, error_details = validate_syntax(test_code)
         if not is_valid:
             print(f"   ⚠️ Warning: Generated code may have syntax errors: {error_msg}")
+            governance_log.log_validation(
+                "syntax_validator",
+                "generated_test_code",
+                False,
+                f"Hallucination: Syntax error in LLM output - {error_msg}",
+            )
+
+        # Explicit hallucination detection
+        hallucinations = detect_hallucinations(test_code, codebase_path)
+        if hallucinations:
+            print(
+                f"   ⚠️ Hallucinations detected: {len(hallucinations)} invalid import(s)"
+            )
+            for h in hallucinations:
+                governance_log.log_validation(
+                    "hallucination_detector",
+                    h["name"],
+                    False,
+                    f"Hallucination: {h['reason']}",
+                )
 
         output_dir.mkdir(parents=True, exist_ok=True)
         test_file = output_dir / f"test_generated_{int(time.time())}.py"
