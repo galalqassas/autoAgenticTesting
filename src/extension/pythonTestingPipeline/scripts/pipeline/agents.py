@@ -23,6 +23,7 @@ from pipeline.prompts import (
     IDENTIFICATION_SYSTEM_PROMPT,
     IMPLEMENTATION_SYSTEM_PROMPT,
 )
+from pipeline.governance import governance_log
 
 
 class BaseAgent:
@@ -38,6 +39,20 @@ class BaseAgent:
 
         # Make the LLM call with automatic fallback
         response, is_mock = self.llm_client.call(system_prompt, user_prompt)
+
+        # Governance: Log decision with transparency and explainability
+        governance_log.log_decision(
+            agent=agent_name,
+            action="llm_call",
+            rationale=f"Processing {agent_name} request via LLM",
+            confidence=0.85 if not is_mock else 0.0,
+            inputs_used={
+                "system_prompt_len": len(system_prompt),
+                "user_prompt_len": len(user_prompt),
+                "model": self.llm_client.current_model,
+                "is_mock": is_mock,
+            },
+        )
 
         # Record the prompt after the call
         prompt_record = {

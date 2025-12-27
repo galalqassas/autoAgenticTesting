@@ -42,6 +42,7 @@ from pipeline.agents import (
     ImplementationAgent,
     EvaluationAgent,
 )
+from pipeline.governance import governance_log
 
 
 # ==================== Pipeline Implementation ====================
@@ -594,6 +595,12 @@ Determine intent. Return JSON:
             prompts_file = self.save_prompts(output_dir, run_id)
             results["prompts_file"] = str(prompts_file)
             results["total_prompts"] = len(self.prompt_history)
+
+            # Export governance audit trail (transparency, explainability, accountability)
+            governance_file = governance_log.export_audit_trail(
+                output_dir / f"governance_{run_id}.json"
+            )
+            results["governance_file"] = str(governance_file)
 
             # Generate markdown report with LLM summary
             report_file = self.generate_report(results, output_dir, run_id)
