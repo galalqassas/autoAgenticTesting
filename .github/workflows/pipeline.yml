@@ -2,14 +2,14 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       # 1. Get the code
       - name: Checkout code
@@ -19,25 +19,31 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
-      # 3. Install Dependencies
+      # 3. Install System Dependencies (for GUI)
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb python3-tk
+
+      # 4. Install Python Dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-cov customtkinter
 
-      # 4. Run GUI Tests
+      # 5. Run GUI Tests (with virtual display)
       - name: Run GUI Tests
-        run: python -m pytest src/extension/GUI/tests/ -v --tb=short
+        run: xvfb-run -a python -m pytest src/extension/GUI/tests/ -v --tb=short
 
-      # 5. Run Agent Tests
+      # 6. Run Agent Tests
       - name: Run Agent Tests
         working-directory: src/extension/pythonTestingPipeline/scripts
         run: python -m pytest pipeline/tests/test_agents.py -v --tb=short
 
-      # 6. Deploy (placeholder)
+      # 7. Deploy (placeholder)
       - name: Deploy
         if: github.ref == 'refs/heads/main'
         run: echo "All tests passed - ready for deployment"
