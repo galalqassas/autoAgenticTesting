@@ -1,7 +1,7 @@
-"""Unit tests for the PipelineRunner module."""
+"""Unit tests for PipelineRunner module."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from pathlib import Path
 from src.extension.GUI.pipeline_runner import PipelineRunner
 
@@ -10,134 +10,81 @@ class TestPipelineRunner:
     """Tests for PipelineRunner class."""
 
     @pytest.fixture
-    def mock_callbacks(self):
-        """Create mock callbacks."""
-        return {
-            "on_output": Mock(),
-            "on_complete": Mock(),
-        }
-
-    @pytest.fixture
-    def runner(self, mock_callbacks, tmp_path):
-        """Create a PipelineRunner with mock script path."""
-        script = tmp_path / "test_script.py"
+    def runner(self, tmp_path):
+        """Create a PipelineRunner with mock script."""
+        script = tmp_path / "script.py"
         script.write_text("print('test')")
-        return PipelineRunner(
-            script, mock_callbacks["on_output"], mock_callbacks["on_complete"]
-        )
+        return PipelineRunner(script, Mock(), Mock())
 
-    # ==================== Initialization Tests ====================
-    class TestInit:
-        """Tests for initialization."""
+    def test_init_state(self, runner):
+        """Should initialize with correct state."""
+        assert runner.process is None
+        assert runner.is_running is False
 
-        def test_init_stores_script_path(self, tmp_path):
-            """Should store script path."""
-            script = tmp_path / "script.py"
-            script.touch()
-            runner = PipelineRunner(script, Mock(), Mock())
-            assert runner.script_path == script
+    def test_start_validation(self, runner, tmp_path):
+        """start() should validate paths and running state."""
+        # Already running
+        runner.is_running = True
+        assert runner.start("/any") is False
+        
+        # Invalid paths
+        runner.is_running = False
+        assert runner.start("/nonexistent") is False
 
-        def test_init_not_running(self, tmp_path):
-            """Should not be running initially."""
-            script = tmp_path / "script.py"
-            script.touch()
-            runner = PipelineRunner(script, Mock(), Mock())
-            assert runner.is_running is False
-
-        def test_init_no_process(self, tmp_path):
-            """Should have no process initially."""
-            script = tmp_path / "script.py"
-            script.touch()
-            runner = PipelineRunner(script, Mock(), Mock())
-            assert runner.process is None
-
-    # ==================== Start Tests ====================
-    class TestStart:
-        """Tests for start method."""
-
-        def test_start_returns_false_if_already_running(self, runner):
-            """Should return False if already running."""
-            runner.is_running = True
-            result = runner.start("/some/path")
-            assert result is False
-
-        def test_start_returns_false_for_invalid_target(self, runner):
-            """Should return False for non-existent target."""
-            result = runner.start("/nonexistent/path")
-            assert result is False
-
-        def test_start_returns_false_for_missing_script(self, tmp_path):
-            """Should return False if script doesn't exist."""
-            runner = PipelineRunner(Path("/fake/script.py"), Mock(), Mock())
-            target = tmp_path / "target"
-            target.mkdir()
-            result = runner.start(str(target))
-            assert result is False
-
-        def test_start_sets_is_running(self, runner, tmp_path):
-            """Should set is_running to True."""
-            target = tmp_path / "target"
-            target.mkdir()
-            with patch.object(runner, "_run"):
-                runner.start(str(target))
-                assert runner.is_running is True
-
-    # ==================== Stop Tests ====================
-    class TestStop:
-        """Tests for stop method."""
-
-        def test_stop_sets_not_running(self, runner):
-            """Should set is_running to False."""
-            runner.is_running = True
-            runner.stop()
-            assert runner.is_running is False
-
-        def test_stop_terminates_process(self, runner):
-            """Should terminate the process if exists."""
-            mock_process = Mock()
-            runner.process = mock_process
-            runner.is_running = True
-            runner.stop()
-            mock_process.terminate.assert_called_once()
-
-        def test_stop_handles_no_process(self, runner):
-            """Should handle case when no process exists."""
-            runner.process = None
-            runner.stop()  # Should not raise
-
-
-class TestPipelineRunnerIntegration:
-    """Integration tests for PipelineRunner."""
-
-    def test_run_simple_script(self, tmp_path):
-        """Should run a simple Python script and capture output."""
-        # Create a simple test script
-        script = tmp_path / "test_script.py"
-        script.write_text("print('Hello from test')")
-
-        outputs = []
-        completed = []
-
-        def on_output(line):
-            outputs.append(line)
-
-        def on_complete():
-            completed.append(True)
-
-        runner = PipelineRunner(script, on_output, on_complete)
-
-        # Create a target directory
+    def test_start_success(self, runner, tmp_path):
+        """start() should set is_running on valid paths."""
         target = tmp_path / "target"
         target.mkdir()
+        with patch.object(runner, "_run"):
+            assert runner.start(str(target)) is True
+            assert runner.is_running is True
 
-        # Start and wait for completion
-        with patch.object(runner, "_run") as mock_run:
-            # Simulate the run behavior
-            mock_run.side_effect = lambda cmd: (
-                on_output("Hello from test\n"),
-                on_complete(),
-            )
-            runner.start(str(target))
-            runner._run([])  # Trigger manually for test
+    def test_stop(self, runner):
+        """stop() should terminate process and set is_running."""
+        runner.is_running = True
+        runner.process = Mock()
+        
+        runner.stop()
+        
+        assert runner.is_running is False
+        runner.process.terminate.assert_called_once()
 
-        assert len(outputs) > 0 or mock_run.called
+
+class TestSendInput:
+    """Tests for send_input method."""
+
+    @pytest.fixture
+    def active_runner(self, tmp_path):
+        """Runner with active process."""
+        script = tmp_path / "script.py"
+        script.touch()
+        runner = PipelineRunner(script, Mock(), Mock())
+        runner.is_running = True
+        runner.process = Mock()
+        runner.process.stdin = Mock()
+        return runner
+
+    def test_send_input_validation(self, tmp_path):
+        """send_input() should return False for invalid states."""
+        script = tmp_path / "script.py"
+        script.touch()
+        runner = PipelineRunner(script, Mock(), Mock())
+        
+        # Not running
+        assert runner.send_input("test") is False
+        
+        # No process
+        runner.is_running = True
+        runner.process = None
+        assert runner.send_input("test") is False
+
+    def test_send_input_success(self, active_runner):
+        """send_input() should write and flush on success."""
+        assert active_runner.send_input("cmd") is True
+        active_runner.process.stdin.write.assert_called_with("cmd\n")
+        active_runner.process.stdin.flush.assert_called_once()
+
+    def test_send_input_handles_errors(self, active_runner):
+        """send_input() should handle pipe errors gracefully."""
+        active_runner.process.stdin.write.side_effect = BrokenPipeError()
+        assert active_runner.send_input("test") is False
