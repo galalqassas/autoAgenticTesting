@@ -6,6 +6,8 @@ It features a multi-agent architecture (Identification, Implementation, Evaluati
 
 ## 🚀 How to Run
 
+## Follow the prerequisits first then the follwing 3 steps
+
 ### 1. GUI (Recommended)
 
 The easiest way to use the pipeline.
@@ -41,5 +43,32 @@ python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <pat
 ```bash
 git clone <repository_url>
 cd autoAgenticTesting
-pip install openai pytest pytest-cov fastapi uvicorn streamlit pandas plotly
+
+#creat virtual enviroment
+python -m venv venv
+
+#Activate the virtual enviroment
+.\venv\Scripts\activate
+
+# Install all dependencies
+pip install -r requirements.txt
+
+# Or install manually
+pip install openai groq pytest pytest-cov fastapi uvicorn streamlit pandas plotly matplotlib customtkinter python-dotenv
+```
+
+### API Keys Setup
+
+Create a `.env` file in the project root and in `src/extension/pythonTestingPipeline/scripts/`:
+
+```env
+# Primary API key
+GROQ_API_KEY=your_groq_key_here
+
+# Or use OpenAI
+OPENAI_API_KEY=your_openai_key_here
+
+# Additional API keys (optional, for fallback)
+GROQ_API_KEY_1=your_second_key
+GROQ_API_KEY_2=your_third_key
 ```
