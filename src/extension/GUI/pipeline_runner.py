@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Callable, Optional
@@ -31,7 +32,7 @@ class PipelineRunner:
             return False
 
         self.is_running = True
-        cmd = ["python", str(self.script_path), target_path]
+        cmd = [sys.executable, str(self.script_path), target_path]
         if auto_approve:
             cmd.append("--auto-approve")
 
