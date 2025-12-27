@@ -11,7 +11,13 @@ from tkinter import filedialog
 import customtkinter as ctk
 
 from .theme import COLORS
-from .widgets import PhaseStep, StatsCard, PerformanceGraph, AgentFlow
+from .widgets import (
+    PhaseStep,
+    StatsCard,
+    PerformanceGraph,
+    AgentFlow,
+    ConversationViewer,
+)
 from .log_parser import LogParser
 from .pipeline_runner import PipelineRunner
 
@@ -54,6 +60,7 @@ class PipelineGUI(ctk.CTk):
         self.runner = PipelineRunner(script_path, self._on_output, self._on_complete)
         self.parser = LogParser()
         self.stats_cards = {}
+        self.latest_prompts_file = None  # Track prompts file from pipeline
 
     def _build_ui(self):
         """Build the complete UI."""
@@ -137,13 +144,102 @@ class PipelineGUI(ctk.CTk):
 
     # ==================== Main Content ====================
     def _build_main_content(self):
-        """Build the main content area."""
-        main = ctk.CTkFrame(self, fg_color="transparent")
-        main.pack(fill="both", expand=True, padx=24, pady=24)
+        """Build the main content area with tabbed interface."""
+        # Main container
+        self.main_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_container.pack(fill="both", expand=True, padx=24, pady=(12, 24))
 
-        self._build_stepper(main)
-        self._build_stats_row(main)
-        self._build_console(main)
+        # Tab bar
+        self._build_tab_bar(self.main_container)
+
+        # Content frames container
+        self.content_container = ctk.CTkFrame(
+            self.main_container, fg_color="transparent"
+        )
+        self.content_container.pack(fill="both", expand=True, pady=(16, 0))
+
+        # Pipeline tab content
+        self.pipeline_frame = ctk.CTkFrame(
+            self.content_container, fg_color="transparent"
+        )
+        self._build_stepper(self.pipeline_frame)
+        self._build_stats_row(self.pipeline_frame)
+        self._build_console(self.pipeline_frame)
+
+        # Prompts tab content
+        self.prompts_frame = ConversationViewer(self.content_container)
+
+        # Show pipeline tab by default
+        self.current_tab = "pipeline"
+        self._show_tab("pipeline")
+
+    def _build_tab_bar(self, parent):
+        """Build the tab navigation bar."""
+        tab_bar = ctk.CTkFrame(
+            parent, fg_color=COLORS["bg_card"], corner_radius=10, height=44
+        )
+        tab_bar.pack(fill="x")
+        tab_bar.pack_propagate(False)
+
+        tab_inner = ctk.CTkFrame(tab_bar, fg_color="transparent")
+        tab_inner.pack(side="left", padx=8, pady=6)
+
+        self.tab_buttons = {}
+
+        # Pipeline tab button
+        self.tab_buttons["pipeline"] = ctk.CTkButton(
+            tab_inner,
+            text="🔧 Pipeline",
+            width=120,
+            height=32,
+            fg_color=COLORS["button_primary"],
+            hover_color=COLORS["button_hover"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+            corner_radius=8,
+            command=lambda: self._show_tab("pipeline"),
+        )
+        self.tab_buttons["pipeline"].pack(side="left", padx=(0, 4))
+
+        # Prompts tab button
+        self.tab_buttons["prompts"] = ctk.CTkButton(
+            tab_inner,
+            text="💬 Prompts",
+            width=120,
+            height=32,
+            fg_color=COLORS["bg_dark"],
+            hover_color=COLORS["border"],
+            font=ctk.CTkFont(size=13),
+            corner_radius=8,
+            command=lambda: self._show_tab("prompts"),
+        )
+        self.tab_buttons["prompts"].pack(side="left", padx=(0, 4))
+
+    def _show_tab(self, tab_name: str):
+        """Switch to the specified tab."""
+        self.current_tab = tab_name
+
+        # Hide all frames
+        self.pipeline_frame.pack_forget()
+        self.prompts_frame.pack_forget()
+
+        # Update button styles
+        for name, btn in self.tab_buttons.items():
+            if name == tab_name:
+                btn.configure(
+                    fg_color=COLORS["button_primary"],
+                    font=ctk.CTkFont(size=13, weight="bold"),
+                )
+            else:
+                btn.configure(
+                    fg_color=COLORS["bg_dark"],
+                    font=ctk.CTkFont(size=13),
+                )
+
+        # Show selected frame
+        if tab_name == "pipeline":
+            self.pipeline_frame.pack(fill="both", expand=True)
+        elif tab_name == "prompts":
+            self.prompts_frame.pack(fill="both", expand=True)
 
     def _build_stepper(self, parent):
         """Build the agent flow stepper."""
@@ -295,6 +391,15 @@ class PipelineGUI(ctk.CTk):
         self._log(line)
         result = self.parser.parse(line)
 
+        # Detect prompts file from pipeline output
+        if "Prompts saved" in line and ":" in line:
+            # Extract path from "Prompts saved: /path/to/file.json" or similar
+            parts = line.split(":", 1)
+            if len(parts) > 1:
+                path = parts[-1].strip().rstrip('"').lstrip('"')
+                if path.endswith(".json"):
+                    self.latest_prompts_file = path
+
         if result.phase_update:
             phase, state = result.phase_update
             self.update_idletasks()
@@ -345,6 +450,18 @@ class PipelineGUI(ctk.CTk):
         )
         self.agent_flow.show_end()
         self._log(f"\n{'=' * 60}\nPipeline execution finished.\n")
+
+        # Auto-load prompts file if available
+        if self.latest_prompts_file:
+            from pathlib import Path
+
+            if Path(self.latest_prompts_file).exists():
+                self._log(f"\n📂 Loading prompts: {self.latest_prompts_file}\n")
+                self.prompts_frame.load_file(self.latest_prompts_file)
+                self.prompts_frame.file_entry.delete(0, "end")
+                self.prompts_frame.file_entry.insert(0, self.latest_prompts_file)
+                self._show_tab("prompts")  # Switch to prompts tab
+            self.latest_prompts_file = None  # Reset for next run
 
     # ==================== Helpers ====================
     def _reset_ui(self):

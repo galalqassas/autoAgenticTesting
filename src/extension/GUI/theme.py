@@ -1,9 +1,5 @@
-"""
-Theme configuration for the Pipeline GUI.
-Centralized colors and styling constants.
-"""
+"""Theme configuration for the Pipeline GUI."""
 
-# Dark mode color palette
 COLORS = {
     # Backgrounds
     "bg_dark": "#1a1a1a",
@@ -16,12 +12,17 @@ COLORS = {
     "text_primary": "#ffffff",
     "text_secondary": "#888888",
     "text_muted": "#666666",
-    # Accents
+    # Accents & Buttons
     "accent_green": "#22c55e",
     "accent_blue": "#3b82f6",
     "accent_red": "#ef4444",
-    # Buttons
     "button_primary": "#3b82f6",
     "button_hover": "#2563eb",
     "button_stop": "#dc2626",
+    # Agent colors (Primary RGB)
+    "agent_red": "#EF4444",
+    "agent_green": "#22C55E",
+    "agent_green_dark": "#16A34A",
+    "agent_blue": "#3B82F6",
+    "agent_gray": "#6B7280",
 }
