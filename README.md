@@ -1,87 +1,123 @@
-# Agentic Testing Pipeline
+# 🕵️ Agentic Testing Pipeline
 
-**An AI-powered automated testing pipeline that autonomously identifies test scenarios, generates PyTest scripts, and evaluates code coverage and security.**
+**An AI-powered automated testing ecosystem that autonomously identifies test scenarios, generates PyTest scripts, and evaluates code coverage & security.**
 
-It features a multi-agent architecture (Identification, Implementation, Evaluation), interactive GUI, and comprehensive security analysis.
+## 📖 Overview
 
-## 🚀 How to Run
+The **Agentic Testing Pipeline** uses a multi-agent LLM architecture to ensure robust code quality. It doesn't just write tests; it intelligently explores your codebase to find edge cases, security vulnerabilities, and logic flows that standard tools miss.
 
-Follow the **Prerequisites** first then choose one of the following:
+### Key Features
 
-### 1. GUI (Recommended)
+- **🤖 Multi-Agent Architecture**:
+  - **Identification Agent**: Scans code to find critical paths, edge cases, and security risks.
+  - **Implementation Agent**: Writes production-ready `pytest` scripts.
+  - **Evaluation Agent**: Runs tests, measures coverage (target 90%), and performs security analysis.
+- **🛡️ Security-First**: Automatically detects SQL Injection, XSS, hardcoded secrets, and more.
+- **📈 Self-Healing**: Iteratively improves tests until coverage and pass-rate goals are met.
+- **🖥️ Multiple Interfaces**: Run via **GUI**, **REST API**, **CLI**, or **VS Code Extension**.
 
-The easiest way to use the pipeline.
+## 🏗️ Architecture
 
-```bash
-python src/extension/GUI/main.py
+The system relies on a feedback loop between agents:
+
+```mermaid
+graph TD
+    User[User Input] --> ID[Identification Agent]
+    ID -->|JSON Scenarios| IMP[Implementation Agent]
+    IMP -->|PyTest Code| EVAL[Evaluation Agent]
+    EVAL -->|Pass/Fail + Coverage| DECISION{Goals Met?}
+    DECISION -- No --> FEEDBACK[Generate Feedback]
+    FEEDBACK --> IMP
+    DECISION -- Yes --> FINAL[Final Report]
 ```
 
-### 2. API Service
+## 📂 Project Structure
 
-Expose the pipeline as a REST service with 25+ endpoints.
+- `src/extension/GUI`: **Desktop App** (CustomTkinter) for easy interaction.
+- `src/extension/api`: **FastAPI Service** exposing agent capabilities over HTTP.
+- `src/extension/pythonTestingPipeline`: **Core Logic** containing the agents and CLI tools.
+- `src/extension/tools`: Helper utilities and shared resources.
 
-```bash
-# Run server (Recommended method)
-python -m uvicorn src.extension.api.main:app --port 8000
+## 🚀 Getting Started
 
-# View Documentation
-# Open http://localhost:8000/ (Redirects to /docs)
-```
-
-#### Example Request:
-
-```bash
-curl -X POST http://localhost:8000/agents/identify \
-  -H "Content-Type: application/json" \
-  -d '{"codebase_path": "/absolute/path/to/code"}'
-```
-
-### 3. CLI
-
-Run directly from the command line.
-
-```bash
-python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <path_to_target> [options]
-```
-
-### 4. VS Code Extension
-
-1. `npm install` then `npm run compile`
-2. Press `F5` to launch.
-3. Command: `Agentic Testing: Generate Tests`
-
-## 🛠️ Prerequisites
+### Prerequisites
 
 - **Python**: 3.10+
-- **Node.js**: 18.0.0+ (for VS Code extension)
-- **API Keys**: Add `OPENAI_API_KEY` or `GROQ_API_KEY` to `.env`.
+- **API Keys**: `GROQ_API_KEY` (or OpenAI) added to your `.env` file.
 
-## 📦 Installation
+### Installation
 
 ```bash
 git clone https://github.com/galalqassas/autoAgenticTesting.git
 cd autoAgenticTesting
-
-# Create virtual environment
 python -m venv venv
-
-# Activate the virtual environment
-.\venv\Scripts\activate
-
-# Install all dependencies
+.\venv\Scripts\activate  # Windows
 pip install -r requirements.txt
-
-# Or install manually
-pip install groq pytest pytest-cov fastapi uvicorn matplotlib customtkinter python-dotenv
 ```
 
-### API Keys Setup
+### Environment Setup
 
-1. Copy `.env.example` to `.env`.
-2. Add your API keys to the `.env` file.
+1.  Copy `.env.example` to `.env`.
+2.  Add your API keys:
+    ```ini
+    GROQ_API_KEY=gsk_...
+    ```
+
+## 🛠️ Usage Options
+
+### 1. Graphical Interface (Recommended)
+
+The most user-friendly way to run the pipeline.
+
+**Steps:**
+
+1.  **Run the GUI**:
+    ```bash
+    python src/extension/GUI/main.py
+    ```
+2.  **Select Target**: Click "Browse" or paste the path to your project directory.
+3.  **Start**: Click the "Start Pipeline" button.
+4.  **Monitor**: Watch the "Agent Flow" tab for real-time progress and "Console" for logs.
+5.  **Review**: Check the "Report" tab for final results, coverage stats, and security findings.
+
+
+
+### 2. REST API Server
+
+Start the backend service to integrate with other tools or build your own UI.
 
 ```bash
-cp .env.example .env
+python -m uvicorn src.extension.api.main:app --port 8000 --reload
 ```
 
-**Note**: The `.env` file **must** be present in `src/extension/pythonTestingPipeline/scripts/` for the Python pipeline to function correctly, as the configuration loader looks for it there. Placing it in the root is recommended for consistency and other tools.
+**What you get:**
+
+- **Interactive Docs**: Go to `http://localhost:8000/docs` to test endpoints.
+- **Full Control**: Endpoints for individual agents (`/agents/identify`, `/agents/implement`), full pipeline runs (`/pipeline/run`), and utility functions.
+
+### 3. Command Line Interface (CLI)
+
+Best for CI/CD pipelines or power users who prefer the terminal.
+
+```bash
+python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <target_directory> [options]
+```
+
+**Common Examples:**
+
+- **Run with coverage**:
+  ```bash
+  python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py ./my_project --coverage
+  ```
+- **Auto-approve (No human in the loop)**:
+  ```bash
+  python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py ./my_project --auto-approve
+  ```
+
+### 4. VS Code Extension
+
+(Requires building the extension)
+
+1.  Navigate to root and run `npm install && npm run compile`.
+2.  Open Debug panel (F5) to launch the Extension Host.
+3.  Command: `Agentic Testing: Generate Tests`.
