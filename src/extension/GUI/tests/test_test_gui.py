@@ -1,6 +1,6 @@
 """Unit tests for test_gui.py launcher script."""
 
-import pytest
+
 from pathlib import Path
 
 

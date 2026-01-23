@@ -616,5 +616,5 @@ def validate_syntax(req: ValidateSyntaxRequest) -> ValidateSyntaxResponse:
                 )
             ],
         )
-    except Exception as e:
+    except Exception:
         return ValidateSyntaxResponse(success=False, is_valid=False, errors=[])

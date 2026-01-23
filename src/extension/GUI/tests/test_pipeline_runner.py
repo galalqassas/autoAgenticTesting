@@ -2,7 +2,6 @@
 
 import pytest
 from unittest.mock import Mock, patch
-from pathlib import Path
 from src.extension.GUI.pipeline_runner import PipelineRunner
 
 

@@ -13,12 +13,22 @@
 		"node": ">=18.0.0",
 		"vscode": "^1.80.0"
 	},
+	"activationEvents": [],
+	"dependencies": {
+		"@vscode/copilot-api": "^0.2.12",
+		"@vscode/l10n": "^0.0.18",
+		"@vscode/prompt-tsx": "^0.2.9-alpha"
+	},
 	"main": "./dist/extension.js",
 	"scripts": {
 		"compile": "tsc -p ./",
 		"watch": "tsc -watch -p ./",
 		"lint": "eslint src --ext ts,tsx",
-		"test": "vitest run",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@types/node": "^18.0.0",
+		"@types/vscode": "^1.80.0",
 		"eslint": "^8.0.0",
 		"typescript": "^5.0.0",
 		"vitest": "^1.0.0"

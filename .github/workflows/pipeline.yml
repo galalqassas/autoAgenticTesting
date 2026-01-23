@@ -2,69 +2,178 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
   pull_request:
-    branches: ["main"]
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  PYTHON_VERSION: "3.11"
 
 jobs:
-  install:
-    name: Install & Lint
+  # ──────────────────────────────────────────────────────────────────────────────
+  # SECURITY (runs in parallel with other validation jobs)
+  # ──────────────────────────────────────────────────────────────────────────────
+  security:
+    name: 🔒 Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Gitleaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_SUMMARY: true
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+
+      - run: pip install -r requirements.txt
+
+      - name: pip-audit
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with: { inputs: requirements.txt, strict: true, summary: true }
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # QUALITY (linting, license audit, import verification)
+  # ──────────────────────────────────────────────────────────────────────────────
+  quality:
+    name: 📦 Quality Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Verify imports
-        run: python -c "import fastapi; import groq; print('All imports OK')"
 
-  agents:
-    name: Agent Tests
-    runs-on: ubuntu-latest
-    needs: install
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-      - name: Install dependencies
-        run: pip install pytest pytest-cov groq
-      - name: Run Agent Tests
-        working-directory: src/extension/pythonTestingPipeline/scripts
-        run: python -m pytest pipeline/tests/test_agents.py -v --tb=short
-
-  gui:
-    name: GUI Tests
-    runs-on: ubuntu-latest
-    needs: install
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-      - name: Install system dependencies
+      - name: Lint (Ruff)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb python3-tk
-      - name: Install Python dependencies
-        run: pip install pytest customtkinter fastapi uvicorn httpx pydantic matplotlib
-      - name: Run GUI Tests
-        run: xvfb-run -a python -m pytest src/extension/GUI/tests/ -v --tb=short
-      - name: Run API Tests
-        run: python -m pytest src/extension/api/tests/test_api.py -v --tb=short
+          pip install ruff
+          ruff check . --output-format=github
 
-  docker:
-    name: Docker Build
+  # ──────────────────────────────────────────────────────────────────────────────
+  # TESTS (run in parallel with security and quality)
+  # ──────────────────────────────────────────────────────────────────────────────
+
+  test-agents:
+    name: 🧪 Agent Tests
     runs-on: ubuntu-latest
-    needs: install
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Build Docker Image
-        run: docker build -t agentic-testing .
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        working-directory: src/extension/pythonTestingPipeline/scripts
+        run: pytest pipeline/tests/test_agents.py -v --tb=short --cov=. --cov-report=xml:coverage-agents.xml
+
+      - name: Upload agents coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-agents
+          path: src/extension/pythonTestingPipeline/scripts/coverage-agents.xml
+
+  test-gui:
+    name: 🖥️ GUI & API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb python3-tk
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: GUI tests
+        run: xvfb-run -a pytest src/extension/GUI/tests/ -v --tb=short --cov=src/extension/GUI --cov=src/extension/api --cov-report=xml:coverage-gui.xml
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Upload GUI coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-gui
+          path: coverage-gui.xml
+
+      - name: API tests
+        run: pytest src/extension/api/tests/test_api.py -v --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # DOCKER BUILD & SCAN (waits for all validation jobs to pass)
+  # ──────────────────────────────────────────────────────────────────────────────
+  docker:
+    name: 🐳 Docker Build & Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [security, quality, test-agents, test-gui]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build with cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: agentic-testing:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: agentic-testing:latest
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: table
+          ignore-unfixed: true
+
+      - name: Trivy SARIF
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: agentic-testing:latest
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+          format: sarif
+          output: trivy.sarif
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: trivy.sarif }

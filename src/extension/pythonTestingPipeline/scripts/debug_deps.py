@@ -1,5 +1,5 @@
 import importlib.metadata
-import sys
+
 
 
 def check_deps(packages):

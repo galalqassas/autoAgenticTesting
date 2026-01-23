@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """LLM client for Groq API with shared rate limiting."""
 
-import os, time, threading
+import os
+import time
+import threading
 from pathlib import Path
 
 try:
@@ -109,7 +111,7 @@ class LLMClient:
                 self._client = self._make_client()
             else:
                 # No key has an available model, wait
-                print(f"   ⏳ All keys/models busy. Waiting 10s...")
+                print("   ⏳ All keys/models busy. Waiting 10s...")
                 time.sleep(10)
                 continue
 

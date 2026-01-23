@@ -3,8 +3,7 @@
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import asdict
+from unittest.mock import Mock, patch
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -12,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from pipeline.models import (
     TestScenario,
     TestScenariosOutput,
-    ExecutionSummary,
     SecurityIssue,
     TestEvaluationOutput,
 )
@@ -214,7 +212,7 @@ class TestImplementationAgent:
         
         with patch("pipeline.agents.gather_python_files", return_value=[codebase / "main.py"]):
             with patch("pipeline.agents.read_file_contents_chunked", return_value=["pass"]):
-                result = agent.fix_syntax_errors(code_with_error, error_msg, codebase, error_details)
+                agent.fix_syntax_errors(code_with_error, error_msg, codebase, error_details)
         
         agent.llm_client.call.assert_called()
 

@@ -1,7 +1,7 @@
 """Data models for Python Testing Pipeline."""
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 __all__ = [
     "TestScenario",

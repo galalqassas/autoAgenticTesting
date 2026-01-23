@@ -1,6 +1,9 @@
 """AI-Powered Minimalistic Todo App"""
 
-import customtkinter as ctk, json, os, threading
+import customtkinter as ctk
+import json
+import os
+import threading
 from datetime import datetime
 from dataclasses import dataclass, field, asdict
 from dotenv import load_dotenv

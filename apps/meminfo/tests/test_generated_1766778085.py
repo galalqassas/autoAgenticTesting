@@ -1,12 +1,9 @@
 import sys
-import os
 import runpy
-import builtins
-import argparse
 import threading
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -14,10 +11,10 @@ import pytest
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import file_reader
-import groq_client
-import main
-import prompt_templates
+import file_reader  # noqa: E402
+import groq_client  # noqa: E402
+import main  # noqa: E402
+import prompt_templates  # noqa: E402
 
 
 # ---------- Helper fixtures ----------
@@ -415,7 +412,7 @@ def test_generated_markdown_sections(monkeypatch):
     )
     monkeypatch.setattr(groq_client, "generate_memorization_guide", lambda c: guide)
     monkeypatch.setattr(file_reader, "read_file", lambda p: "content")
-    output_path = Path("dummy_output.md")
+
     with patch.object(Path, "write_text", return_value=None) as mock_write:
         sys.argv = ["main.py", "input.md"]
         runpy.run_path(str(main.__file__), run_name="__main__")

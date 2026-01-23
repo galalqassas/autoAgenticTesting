@@ -1,6 +1,6 @@
 """Unit tests for theme module."""
 
-import pytest
+
 from src.extension.GUI.theme import COLORS
 
 

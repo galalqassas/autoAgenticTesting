@@ -27,7 +27,7 @@ def main():
     print(f"📖 Reading: {input_path}")
     content = read_file(str(input_path))
 
-    print(f"🤖 Generating memorization guide using Groq AI...")
+    print("🤖 Generating memorization guide using Groq AI...")
     guide = generate_memorization_guide(content)
 
     output_path.write_text(guide, encoding="utf-8")
