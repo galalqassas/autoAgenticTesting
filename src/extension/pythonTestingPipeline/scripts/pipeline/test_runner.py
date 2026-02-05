@@ -252,16 +252,35 @@ def parse_pytest_output(output: str) -> Dict[str, int]:
     return {"total": total, "passed": passed, "failed": failed}
 
 
-def parse_coverage_json(coverage_json_path: Path) -> float:
-    """Parses coverage.json to extract total coverage percentage."""
+def parse_coverage_json(coverage_json_path: Path, source_root: Path) -> dict:
+    """
+    Parses coverage.json to extract detailed coverage information.
+    
+    Returns a dict with:
+      - percentage: overall coverage percentage
+      - uncovered_areas_text: formatted string for LLM
+      - detailed_reports: dict of FileCoverageReport (as dicts)
+    """
     try:
+        from pipeline.coverage import (
+            analyze_coverage,
+            format_uncovered_areas,
+            get_overall_percentage,
+        )
+        from dataclasses import asdict
+
         if coverage_json_path.exists():
-            with open(coverage_json_path, "r") as f:
-                data = json.load(f)
-                return data.get("totals", {}).get("percent_covered", 0.0)
+            reports = analyze_coverage(coverage_json_path, source_root)
+            return {
+                "percentage": get_overall_percentage(reports),
+                "uncovered_areas_text": format_uncovered_areas(reports),
+                "detailed_reports": {
+                    fp: asdict(r) for fp, r in reports.items()
+                },
+            }
     except Exception as e:
         print(f"   ⚠️ Could not parse coverage.json: {e}")
-    return 0.0
+    return {"percentage": 0.0, "uncovered_areas_text": "", "detailed_reports": {}}
 
 
 def run_tests(test_file: Path, codebase_path: Path) -> dict:
@@ -325,7 +344,7 @@ omit =
 
         # Parse coverage from JSON report
         coverage_json_path = test_file.parent.parent / "coverage.json"
-        coverage_pct = parse_coverage_json(coverage_json_path)
+        coverage_data = parse_coverage_json(coverage_json_path, codebase_path)
 
         return {
             "output": output,
@@ -333,7 +352,9 @@ omit =
             "total_tests": test_results["total"],
             "passed": test_results["passed"],
             "failed": test_results["failed"],
-            "coverage_percentage": coverage_pct,
+            "coverage_percentage": coverage_data["percentage"],
+            "uncovered_areas_text": coverage_data["uncovered_areas_text"],
+            "coverage_details": coverage_data["detailed_reports"],
         }
     except subprocess.TimeoutExpired:
         return {
@@ -343,6 +364,8 @@ omit =
             "passed": 0,
             "failed": 0,
             "coverage_percentage": 0.0,
+            "uncovered_areas_text": "",
+            "coverage_details": {},
         }
     except Exception as e:
         return {
@@ -352,4 +375,6 @@ omit =
             "passed": 0,
             "failed": 0,
             "coverage_percentage": 0.0,
+            "uncovered_areas_text": "",
+            "coverage_details": {},
         }

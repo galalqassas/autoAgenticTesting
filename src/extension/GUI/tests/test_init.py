@@ -22,6 +22,7 @@ class TestPackageExports:
             PromptCard,
             ConversationViewer,
             ReportViewer,
+            CoverageViewer,
         )
         import src.extension.GUI.widgets as widgets
 
@@ -35,6 +36,7 @@ class TestPackageExports:
                 PromptCard,
                 ConversationViewer,
                 ReportViewer,
+                CoverageViewer,
             ]
         )
         assert set(widgets.__all__) == {
@@ -45,4 +47,5 @@ class TestPackageExports:
             "PromptCard",
             "ConversationViewer",
             "ReportViewer",
+            "CoverageViewer",
         }

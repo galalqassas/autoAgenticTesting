@@ -261,6 +261,7 @@ class TestWidgetsPackage:
             PromptCard,
             ConversationViewer,
             ReportViewer,
+            CoverageViewer,
         )
 
         assert all(
@@ -273,6 +274,7 @@ class TestWidgetsPackage:
                 PromptCard,
                 ConversationViewer,
                 ReportViewer,
+                CoverageViewer,
             ]
         )
 
@@ -288,5 +290,105 @@ class TestWidgetsPackage:
             "PromptCard",
             "ConversationViewer",
             "ReportViewer",
+            "CoverageViewer",
         }
         assert set(widgets.__all__) == expected
+
+
+class TestCoverageViewer:
+    """Tests for CoverageViewer widget."""
+
+    def test_class_structure(self):
+        """CoverageViewer should inherit from CTkFrame and have required methods."""
+        from src.extension.GUI.widgets.coverage_viewer import CoverageViewer
+        import customtkinter as ctk
+
+        assert issubclass(CoverageViewer, ctk.CTkFrame)
+        for method in ["load_file", "reset", "_browse", "_render", "_open_in_editor"]:
+            assert callable(getattr(CoverageViewer, method))
+
+    def test_has_build_ui(self):
+        """CoverageViewer should have _build_ui method."""
+        from src.extension.GUI.widgets.coverage_viewer import CoverageViewer
+
+        assert callable(getattr(CoverageViewer, "_build_ui"))
+
+
+class TestFileCoverageCard:
+    """Tests for FileCoverageCard widget."""
+
+    def test_class_structure(self):
+        """FileCoverageCard should inherit from CTkFrame and have required methods."""
+        from src.extension.GUI.widgets.coverage_viewer import FileCoverageCard
+        import customtkinter as ctk
+
+        assert issubclass(FileCoverageCard, ctk.CTkFrame)
+        for method in ["_toggle_expand", "_show_details", "_toggle_code_context", "_render_function_row"]:
+            assert callable(getattr(FileCoverageCard, method))
+
+
+class TestCodeContextViewer:
+    """Tests for CodeContextViewer widget."""
+
+    def test_class_structure(self):
+        """CodeContextViewer should inherit from CTkFrame and have required methods."""
+        from src.extension.GUI.widgets.coverage_viewer import CodeContextViewer
+        import customtkinter as ctk
+
+        assert issubclass(CodeContextViewer, ctk.CTkFrame)
+        for method in ["_build_ui", "_load_content"]:
+            assert callable(getattr(CodeContextViewer, method))
+
+
+class TestCoverageHelperFunctions:
+    """Tests for coverage helper functions."""
+
+    def test_get_color_for_pct_green(self):
+        """_get_color_for_pct should return green for >=80%."""
+        from src.extension.GUI.widgets.coverage_viewer import _get_color_for_pct
+        from src.extension.GUI.theme import COLORS
+
+        assert _get_color_for_pct(100) == COLORS["accent_green"]
+        assert _get_color_for_pct(80) == COLORS["accent_green"]
+
+    def test_get_color_for_pct_yellow(self):
+        """_get_color_for_pct should return yellow for 50-79%."""
+        from src.extension.GUI.widgets.coverage_viewer import _get_color_for_pct
+
+        assert _get_color_for_pct(79) == "#facc15"
+        assert _get_color_for_pct(50) == "#facc15"
+
+    def test_get_color_for_pct_red(self):
+        """_get_color_for_pct should return red for <50%."""
+        from src.extension.GUI.widgets.coverage_viewer import _get_color_for_pct
+        from src.extension.GUI.theme import COLORS
+
+        assert _get_color_for_pct(49) == COLORS["accent_red"]
+        assert _get_color_for_pct(0) == COLORS["accent_red"]
+
+    def test_format_line_ranges_empty(self):
+        """_format_line_ranges should return empty string for empty list."""
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
+
+        assert _format_line_ranges([]) == ""
+
+    def test_format_line_ranges_single(self):
+        """_format_line_ranges should format single line."""
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
+
+        assert _format_line_ranges([5]) == "5"
+
+    def test_format_line_ranges_consecutive(self):
+        """_format_line_ranges should collapse consecutive lines into ranges."""
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
+
+        assert _format_line_ranges([1, 2, 3]) == "1-3"
+        assert _format_line_ranges([1, 2, 3, 5, 6, 10]) == "1-3, 5-6, 10"
+
+    def test_format_line_ranges_limit(self):
+        """_format_line_ranges should respect limit parameter."""
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
+
+        result = _format_line_ranges([1, 3, 5, 7, 9, 11, 13], limit=3)
+        assert result.endswith("...")
+        assert result.count(",") == 2

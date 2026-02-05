@@ -18,6 +18,7 @@ from .widgets import (
     AgentFlow,
     ConversationViewer,
     ReportViewer,
+    CoverageViewer,
 )
 from .log_parser import LogParser
 from .pipeline_runner import PipelineRunner
@@ -177,6 +178,10 @@ class PipelineGUI(ctk.CTk):
         # Report tab content
         self.report_frame = ReportViewer(self.content_container)
 
+        # Coverage tab content
+        self.coverage_frame = CoverageViewer(self.content_container)
+        self.latest_coverage_file = None  # Track coverage file from pipeline
+
         # Show pipeline tab by default
         self.current_tab = "pipeline"
         self._show_tab("pipeline")
@@ -236,6 +241,20 @@ class PipelineGUI(ctk.CTk):
         )
         self.tab_buttons["report"].pack(side="left", padx=(0, 4))
 
+        # Coverage tab button
+        self.tab_buttons["coverage"] = ctk.CTkButton(
+            tab_inner,
+            text="📊 Coverage",
+            width=120,
+            height=32,
+            fg_color=COLORS["bg_dark"],
+            hover_color=COLORS["border"],
+            font=ctk.CTkFont(size=13),
+            corner_radius=8,
+            command=lambda: self._show_tab("coverage"),
+        )
+        self.tab_buttons["coverage"].pack(side="left", padx=(0, 4))
+
     def _show_tab(self, tab_name: str):
         """Switch to the specified tab."""
         self.current_tab = tab_name
@@ -244,6 +263,7 @@ class PipelineGUI(ctk.CTk):
         self.pipeline_frame.pack_forget()
         self.prompts_frame.pack_forget()
         self.report_frame.pack_forget()
+        self.coverage_frame.pack_forget()
 
         # Update button styles
         for name, btn in self.tab_buttons.items():
@@ -265,6 +285,8 @@ class PipelineGUI(ctk.CTk):
             self.prompts_frame.pack(fill="both", expand=True)
         elif tab_name == "report":
             self.report_frame.pack(fill="both", expand=True)
+        elif tab_name == "coverage":
+            self.coverage_frame.pack(fill="both", expand=True)
 
     def _build_stepper(self, parent):
         """Build the agent flow stepper."""
@@ -434,6 +456,14 @@ class PipelineGUI(ctk.CTk):
                 if path.endswith(".md"):
                     self.latest_report_file = path
 
+        # Detect coverage report file from pipeline output
+        if "Coverage Report saved:" in line:
+            parts = line.split(":", 1)
+            if len(parts) > 1:
+                path = parts[-1].strip().rstrip('"').lstrip('"')
+                if path.endswith(".json"):
+                    self.latest_coverage_file = path
+
         if result.phase_update:
             phase, state = result.phase_update
             self.update_idletasks()
@@ -518,8 +548,17 @@ class PipelineGUI(ctk.CTk):
                 self.report_frame.load_file(self.latest_report_file)
                 self.report_frame.file_entry.delete(0, "end")
                 self.report_frame.file_entry.insert(0, self.latest_report_file)
-                self._show_tab("report")  # Switch to report tab
             self.latest_report_file = None  # Reset for next run
+
+        # Auto-load coverage file if available
+        if self.latest_coverage_file:
+            if Path(self.latest_coverage_file).exists():
+                self._log(f"\n📊 Loading coverage: {self.latest_coverage_file}\n")
+                self.coverage_frame.load_file(self.latest_coverage_file)
+                self.coverage_frame.file_entry.delete(0, "end")
+                self.coverage_frame.file_entry.insert(0, self.latest_coverage_file)
+                self._show_tab("coverage")  # Switch to coverage tab
+            self.latest_coverage_file = None  # Reset for next run
 
     # ==================== Helpers ====================
     def _reset_ui(self):

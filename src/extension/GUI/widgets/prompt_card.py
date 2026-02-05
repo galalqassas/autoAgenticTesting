@@ -65,13 +65,13 @@ class CollapsibleSection(ctk.CTkFrame):
         ctk.CTkLabel(
             left,
             text=f"{ICONS.get(title, '📋')} {title}",
-            font=ctk.CTkFont(size=10, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color=accent,
         ).pack(side="left", padx=4)
         ctk.CTkLabel(
             left,
             text=f"{len(content):,} chars",
-            font=ctk.CTkFont(size=9),
+            font=ctk.CTkFont(size=14),
             text_color=COLORS["text_muted"],
         ).pack(side="left", padx=6)
 
@@ -82,7 +82,7 @@ class CollapsibleSection(ctk.CTkFrame):
             height=18,
             fg_color=COLORS["border"],
             hover_color=COLORS["button_primary"],
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=14),
             command=self._copy,
         )
         self.copy_btn.pack(side="right")
@@ -92,7 +92,7 @@ class CollapsibleSection(ctk.CTkFrame):
             self,
             fg_color=blend("#0a0a0a", accent, 0.05),
             text_color=COLORS["text_primary"],
-            font=ctk.CTkFont(family="Consolas", size=10),
+            font=ctk.CTkFont(family="Consolas", size=14),
             corner_radius=4,
             height=80,
             wrap="word",
@@ -151,7 +151,7 @@ class PromptCard(ctk.CTkFrame):
             ctk.CTkLabel(
                 idx,
                 text=f"{index}/{total}",
-                font=ctk.CTkFont(size=9, weight="bold"),
+                font=ctk.CTkFont(size=20, weight="bold"),
                 text_color=COLORS["text_secondary"],
             ).pack(padx=4, pady=1)
 
@@ -167,14 +167,14 @@ class PromptCard(ctk.CTkFrame):
         ctk.CTkLabel(
             badge,
             text=f"{icon} {agent}",
-            font=ctk.CTkFont(size=10, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#fff",
         ).pack(padx=6, pady=2)
 
         ctk.CTkLabel(
             hdr,
             text=data.get("timestamp", ""),
-            font=ctk.CTkFont(size=9),
+            font=ctk.CTkFont(size=14),
             text_color=COLORS["text_muted"],
         ).pack(side="left", padx=8)
 
@@ -184,7 +184,7 @@ class PromptCard(ctk.CTkFrame):
         ctk.CTkLabel(
             tag,
             text=model,
-            font=ctk.CTkFont(size=8),
+            font=ctk.CTkFont(size=17),
             text_color=COLORS["text_secondary"],
         ).pack(padx=4, pady=1)
 

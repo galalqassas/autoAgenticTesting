@@ -39,7 +39,7 @@ class ConversationViewer(ctk.CTkFrame):
         ctk.CTkLabel(
             inner,
             text="📁 Load:",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=17),
             text_color=COLORS["text_secondary"],
         ).pack(side="left")
         self.file_entry = ctk.CTkEntry(
@@ -65,7 +65,7 @@ class ConversationViewer(ctk.CTkFrame):
         ctk.CTkLabel(
             inner,
             text="🔎",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=17),
             text_color=COLORS["text_secondary"],
         ).pack(side="left")
         self.filter_dd = ctk.CTkOptionMenu(
@@ -78,7 +78,7 @@ class ConversationViewer(ctk.CTkFrame):
             button_hover_color=COLORS["button_hover"],
             dropdown_fg_color=COLORS["bg_card"],
             dropdown_hover_color=COLORS["accent_blue"],
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=13),
             corner_radius=8,
             command=self._on_filter,
         )
@@ -96,14 +96,14 @@ class ConversationViewer(ctk.CTkFrame):
                 height=28,
                 fg_color=COLORS["bg_dark"],
                 hover_color=COLORS["border"],
-                font=ctk.CTkFont(size=10),
+                font=ctk.CTkFont(size=14),
                 command=cmd,
             ).pack(side="left", padx=2)
 
         self.stats = ctk.CTkLabel(
             inner,
             text="No prompts",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=17),
             text_color=COLORS["text_muted"],
         )
         self.stats.pack(side="right")
@@ -120,7 +120,7 @@ class ConversationViewer(ctk.CTkFrame):
         self.empty = ctk.CTkLabel(
             self.scroll,
             text="📂 No prompts loaded.\nClick 'Browse' to load.",
-            font=ctk.CTkFont(size=14),
+            font=ctk.CTkFont(size=20),
             text_color=COLORS["text_muted"],
             justify="center",
         )

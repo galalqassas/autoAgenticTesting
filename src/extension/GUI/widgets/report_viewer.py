@@ -7,28 +7,28 @@ import customtkinter as ctk
 from ..theme import COLORS
 
 TAGS = {
-    "h1": {"font": ("Segoe UI", 20, "bold"), "foreground": "#60a5fa", "spacing3": 12},
+    "h1": {"font": ("Segoe UI", 28, "bold"), "foreground": "#60a5fa", "spacing3": 12},
     "h2": {
-        "font": ("Segoe UI", 16, "bold"),
+        "font": ("Segoe UI", 22, "bold"),
         "foreground": "#818cf8",
         "spacing1": 16,
         "spacing3": 8,
     },
     "h3": {
-        "font": ("Segoe UI", 14, "bold"),
+        "font": ("Segoe UI", 20, "bold"),
         "foreground": "#a78bfa",
         "spacing1": 12,
         "spacing3": 6,
     },
-    "bold": {"font": ("Consolas", 12, "bold"), "foreground": "#f9fafb"},
+    "bold": {"font": ("Consolas", 17, "bold"), "foreground": "#f9fafb"},
     "code": {
-        "font": ("Consolas", 11),
+        "font": ("Consolas", 15),
         "foreground": "#4ade80",
         "background": "#1e293b",
     },
-    "th": {"font": ("Consolas", 11, "bold"), "foreground": "#60a5fa"},
-    "td": {"font": ("Consolas", 11), "foreground": "#94a3b8"},
-    "border": {"font": ("Consolas", 11), "foreground": "#475569"},
+    "th": {"font": ("Consolas", 15, "bold"), "foreground": "#60a5fa"},
+    "td": {"font": ("Consolas", 15), "foreground": "#94a3b8"},
+    "border": {"font": ("Consolas", 15), "foreground": "#475569"},
     "bullet": {"foreground": "#60a5fa"},
 }
 
@@ -54,7 +54,7 @@ class ReportViewer(ctk.CTkFrame):
         ctk.CTkLabel(
             inner,
             text="📄 Report:",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=17),
             text_color=COLORS["text_secondary"],
         ).pack(side="left")
         self.file_entry = ctk.CTkEntry(
@@ -78,7 +78,7 @@ class ReportViewer(ctk.CTkFrame):
         self.status = ctk.CTkLabel(
             inner,
             text="No report",
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=15),
             text_color=COLORS["text_muted"],
         )
         self.status.pack(side="right")
@@ -88,7 +88,7 @@ class ReportViewer(ctk.CTkFrame):
             self,
             fg_color=COLORS["bg_card"],
             text_color=COLORS["text_primary"],
-            font=ctk.CTkFont(family="Consolas", size=12),
+            font=ctk.CTkFont(family="Consolas", size=17),
             corner_radius=12,
             wrap="word",
         )
@@ -100,7 +100,7 @@ class ReportViewer(ctk.CTkFrame):
         self.empty = ctk.CTkLabel(
             self,
             text="📄 No report loaded.\nClick 'Browse' to open.",
-            font=ctk.CTkFont(size=14),
+            font=ctk.CTkFont(size=20),
             text_color=COLORS["text_muted"],
             justify="center",
         )
