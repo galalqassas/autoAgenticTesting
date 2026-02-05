@@ -87,10 +87,14 @@ def analyze_coverage(
         function_reports = []
         for defn in definitions:
             defn_lines = set(range(defn.start_line, defn.end_line + 1))
-            defn_covered = defn_lines & executed_lines
-            defn_uncovered = defn_lines & missing_lines
+            function_executable_lines = (executed_lines | missing_lines) & defn_lines
+            
+            valid_executable_lines = function_executable_lines - excluded_lines
+            
+            defn_covered = valid_executable_lines & executed_lines
+            defn_uncovered = valid_executable_lines & missing_lines
 
-            total = len(defn_lines - excluded_lines)
+            total = len(valid_executable_lines)
             covered = len(defn_covered)
             pct = (covered / total * 100) if total > 0 else 0.0
 

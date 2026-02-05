@@ -7,6 +7,7 @@ from .agent_flow import AgentFlow
 from .prompt_card import PromptCard
 from .conversation_viewer import ConversationViewer
 from .report_viewer import ReportViewer
+from .coverage_viewer import CoverageViewer
 
 __all__ = [
     "PhaseStep",
@@ -16,4 +17,6 @@ __all__ = [
     "PromptCard",
     "ConversationViewer",
     "ReportViewer",
+    "CoverageViewer",
 ]
+

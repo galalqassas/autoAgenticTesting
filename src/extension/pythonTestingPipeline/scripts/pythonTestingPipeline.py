@@ -596,7 +596,6 @@ Determine intent. Return JSON:
             results["prompts_file"] = str(prompts_file)
             results["total_prompts"] = len(self.prompt_history)
 
-            # Export coverage report JSON for GUI consumption
             if "coverage_details" in (test_results or {}):
                 coverage_report_path = output_dir / f"coverage_report_{run_id}.json"
                 try:
