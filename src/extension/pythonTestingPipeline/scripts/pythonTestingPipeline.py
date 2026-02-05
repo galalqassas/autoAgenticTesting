@@ -519,9 +519,9 @@ Determine intent. Return JSON:
                     print(f"   ⚠️  Needs improvement: {', '.join(status_parts)}")
 
                     # Extract uncovered areas from test output
-                    uncovered_areas = self._extract_uncovered_areas(
-                        test_results["output"]
-                    )
+                    uncovered_areas = test_results.get(
+                        "uncovered_areas_text", ""
+                    ) or self._extract_uncovered_areas(test_results["output"])
 
                     # Check for syntax errors in output
                     syntax_errors = ""
@@ -595,6 +595,18 @@ Determine intent. Return JSON:
             prompts_file = self.save_prompts(output_dir, run_id)
             results["prompts_file"] = str(prompts_file)
             results["total_prompts"] = len(self.prompt_history)
+
+            # Export coverage report JSON for GUI consumption
+            if "coverage_details" in (test_results or {}):
+                coverage_report_path = output_dir / f"coverage_report_{run_id}.json"
+                try:
+                    with open(coverage_report_path, "w", encoding="utf-8") as f:
+                        import json
+                        json.dump(test_results["coverage_details"], f, indent=2)
+                    results["coverage_report_file"] = str(coverage_report_path)
+                    print(f"Coverage Report saved: {coverage_report_path}")
+                except Exception as e:
+                    print(f"   ⚠️ Could not save coverage report: {e}")
 
             # Export governance audit trail (transparency, explainability, accountability)
             governance_file = governance_log.export_audit_trail(

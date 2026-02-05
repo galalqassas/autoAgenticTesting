@@ -5,7 +5,74 @@ import re
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-__all__ = ["validate_syntax", "sanitize_code", "detect_hallucinations"]
+from dataclasses import dataclass
+
+__all__ = [
+    "validate_syntax",
+    "sanitize_code",
+    "detect_hallucinations",
+    "CodeDefinition",
+    "extract_code_definitions",
+]
+
+
+@dataclass
+class CodeDefinition:
+    """Represents a function or class definition with its line range."""
+
+    type: str  # 'FunctionDef', 'ClassDef', 'AsyncFunctionDef'
+    name: str
+    start_line: int  # 1-indexed
+    end_line: int  # 1-indexed
+
+
+def extract_code_definitions(
+    source_code: str, recursive: bool = False
+) -> list[CodeDefinition]:
+    """
+    Extracts function and class definitions from Python source code.
+
+    Args:
+        source_code: Python source code string.
+        recursive: If False (default), only top-level definitions are returned.
+                   If True, all nested definitions are included.
+
+    Returns:
+        List of CodeDefinition objects with name and line ranges.
+    """
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return []
+
+    definitions = []
+
+    if recursive:
+        # Walk all nodes in the tree
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+                definitions.append(
+                    CodeDefinition(
+                        type=node.__class__.__name__,
+                        name=node.name,
+                        start_line=node.lineno,
+                        end_line=node.end_lineno or node.lineno,
+                    )
+                )
+    else:
+        # Only top-level definitions (direct children of the module)
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+                definitions.append(
+                    CodeDefinition(
+                        type=node.__class__.__name__,
+                        name=node.name,
+                        start_line=node.lineno,
+                        end_line=node.end_lineno or node.lineno,
+                    )
+                )
+
+    return definitions
 
 
 def validate_syntax(code: str) -> Tuple[bool, str, Optional[dict]]:

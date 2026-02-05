@@ -76,36 +76,28 @@ def read_file_contents_chunked(
 
             # Try to parse with AST
             try:
-                tree = ast.parse(file_content)
+                from pipeline.code_utils import extract_code_definitions
 
-                # Extract top-level definitions with their line ranges
-                definitions = []
-                for node in ast.iter_child_nodes(tree):
-                    if isinstance(
-                        node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)
-                    ):
-                        # Get the line range of this definition
-                        start_line = node.lineno - 1  # Convert to 0-indexed
-                        end_line = (
-                            node.end_lineno if node.end_lineno else start_line + 1
-                        )
+                definitions = extract_code_definitions(file_content, recursive=False)
 
-                        definitions.append(
-                            {
-                                "type": node.__class__.__name__,
-                                "name": node.name,
-                                "start": start_line,
-                                "end": end_line,
-                                "lines": end_line - start_line,
-                            }
-                        )
+                # Convert CodeDefinition objects to dict format for compatibility
+                def_dicts = [
+                    {
+                        "type": d.type,
+                        "name": d.name,
+                        "start": d.start_line - 1,  # Convert to 0-indexed
+                        "end": d.end_line,
+                        "lines": d.end_line - d.start_line + 1,
+                    }
+                    for d in definitions
+                ]
 
                 # Group definitions into chunks
-                if definitions:
+                if def_dicts:
                     current_chunk_defs = []
                     current_chunk_lines = 0
 
-                    for defn in definitions:
+                    for defn in def_dicts:
                         # If adding this definition exceeds the limit and we have existing defs
                         if (
                             current_chunk_lines + defn["lines"] > max_lines_per_chunk
