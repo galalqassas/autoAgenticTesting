@@ -3,7 +3,28 @@
 import json
 import time
 from dataclasses import dataclass, asdict
+from enum import Enum
 from pathlib import Path
+
+
+class FailureReason(Enum):
+    """Categorized reasons for pipeline iteration failures."""
+
+    COVERAGE_LOW = "coverage_low"
+    SYNTAX_ERROR = "syntax_error"
+    SECURITY_ISSUE = "security_issue"
+    HALLUCINATION = "hallucination"
+    TEST_FAILURE = "test_failure"
+
+
+@dataclass
+class Failure:
+    """Pipeline failure record with categorization."""
+
+    timestamp: str
+    reason: FailureReason
+    details: str
+    iteration: int
 
 
 @dataclass
@@ -34,7 +55,7 @@ class GovernanceLog:
     """Logs agent decisions with governance metadata."""
 
     def __init__(self):
-        self.decisions, self.validations = [], []
+        self.decisions, self.validations, self.failures = [], [], []
         self._start = time.time()
 
     def log_decision(
@@ -73,6 +94,19 @@ class GovernanceLog:
         self.validations.append(record)
         return record
 
+    def log_failure(
+        self, reason: FailureReason, details: str, iteration: int = 0
+    ) -> Failure:
+        """Log a categorized pipeline failure."""
+        record = Failure(
+            timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            reason=reason,
+            details=details,
+            iteration=iteration,
+        )
+        self.failures.append(record)
+        return record
+
     def get_audit_trail(self) -> dict:
         """Get complete audit trail."""
         agents = list(set(d.agent for d in self.decisions))
@@ -83,18 +117,30 @@ class GovernanceLog:
         )
         failed = sum(1 for v in self.validations if not v.passed)
 
+        # Failure breakdown by category
+        failure_breakdown = {}
+        for f in self.failures:
+            key = f.reason.value
+            failure_breakdown[key] = failure_breakdown.get(key, 0) + 1
+
         return {
-            "governance_version": "1.0",
+            "governance_version": "1.1",
             "pipeline_start": time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(self._start)
             ),
             "decisions": [asdict(d) for d in self.decisions],
             "validations": [asdict(v) for v in self.validations],
+            "failures": [
+                {"timestamp": f.timestamp, "reason": f.reason.value, "details": f.details, "iteration": f.iteration}
+                for f in self.failures
+            ],
             "summary": {
                 "agents_involved": agents,
                 "total_decisions": len(self.decisions),
                 "average_confidence": round(avg_conf, 2),
                 "failed_validations": failed,
+                "total_failures": len(self.failures),
+                "failure_breakdown": failure_breakdown,
                 "status": "PASS" if failed == 0 else "REVIEW_NEEDED",
             },
         }
@@ -112,6 +158,7 @@ class GovernanceLog:
         """Reset for new run."""
         self.decisions.clear()
         self.validations.clear()
+        self.failures.clear()
         self._start = time.time()
 
 

@@ -11,7 +11,7 @@ class TestTestGuiScript:
         """Script should exist with required components."""
         script_path = Path(__file__).parent.parent / "test_gui.py"
         content = script_path.read_text()
-        
+
         assert script_path.exists()
         assert "def main():" in content
         assert "PipelineGUI" in content

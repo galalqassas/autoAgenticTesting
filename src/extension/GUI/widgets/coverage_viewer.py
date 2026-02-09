@@ -56,21 +56,21 @@ class CodeContextViewer(ctk.CTkFrame):
             wrap="none", height=300
         )
         self.textbox.pack(fill="both", expand=True)
-        
+
         try:
             self.textbox._textbox.tag_config("uncovered", background="#3f1313", foreground="#fca5a5")
             self.textbox._textbox.tag_config("covered", background="#0c2e17", foreground="#86efac")
             self.textbox._textbox.tag_config("linenum", foreground=COLORS["text_muted"])
         except Exception:
             pass
-        
+
         self._load_content()
 
     def _load_content(self):
         path = Path(self.file_path)
         self.textbox.configure(state="normal")
         self.textbox.delete("1.0", "end")
-        
+
         if not path.exists():
             self.textbox.insert("end", f"File not found: {self.file_path}")
         else:
@@ -80,7 +80,7 @@ class CodeContextViewer(ctk.CTkFrame):
                     self.textbox.insert("end", line, "uncovered" if i in self.uncovered_lines else "covered")
             except Exception as e:
                 self.textbox.insert("end", f"Error loading file: {e}")
-        
+
         self.textbox.configure(state="disabled")
 
 
@@ -115,7 +115,7 @@ class FileCoverageCard(ctk.CTkFrame):
 
         pct = self.file_data.get("coverage_percentage", 0.0)
         color = _get_color_for_pct(pct)
-        
+
         ctk.CTkLabel(
             header, text=f"{pct:.1f}%", font=ctk.CTkFont(size=17, weight="bold"), text_color=color
         ).pack(side="right", padx=(8, 0))
@@ -127,7 +127,7 @@ class FileCoverageCard(ctk.CTkFrame):
     def _toggle_expand(self):
         self.expanded = not self.expanded
         self.expand_icon.configure(text="▼" if self.expanded else "▶")
-        
+
         if self.expanded:
             self._show_details()
         elif self.detail_frame:
@@ -147,7 +147,7 @@ class FileCoverageCard(ctk.CTkFrame):
         if uncovered:
             row = ctk.CTkFrame(self.detail_frame, fg_color="transparent")
             row.pack(fill="x", padx=8, pady=4)
-            
+
             ctk.CTkLabel(
                 row, text=f"Uncovered: {_format_line_ranges(uncovered)}",
                 font=ctk.CTkFont(size=15), text_color=COLORS["accent_red"]
@@ -189,7 +189,7 @@ class FileCoverageCard(ctk.CTkFrame):
             row, text=f"  {name}()", font=ctk.CTkFont(family="Consolas", size=15),
             text_color=COLORS["text_secondary"]
         ).pack(side="left")
-        
+
         ctk.CTkLabel(
             row, text=f"{pct:.0f}%", font=ctk.CTkFont(size=15), text_color=_get_color_for_pct(pct)
         ).pack(side="right", padx=(0, 8))
@@ -240,10 +240,10 @@ class CoverageViewer(ViewerToolbarMixin, ctk.CTkFrame):
             path = Path(filepath)
             if not path.exists():
                 return self._show_error(f"File not found: {filepath}")
-            
+
             with open(path, "r", encoding="utf-8") as f:
                 self.data = json.load(f)
-            
+
             self.data_source_path = path
             self.empty.place_forget()
             self._render()

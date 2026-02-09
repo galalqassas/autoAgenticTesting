@@ -25,7 +25,7 @@ class TestPipelineRunner:
         # Already running
         runner.is_running = True
         assert runner.start("/any") is False
-        
+
         # Invalid paths
         runner.is_running = False
         assert runner.start("/nonexistent") is False
@@ -42,9 +42,9 @@ class TestPipelineRunner:
         """stop() should terminate process and set is_running."""
         runner.is_running = True
         runner.process = Mock()
-        
+
         runner.stop()
-        
+
         assert runner.is_running is False
         runner.process.terminate.assert_called_once()
 
@@ -68,10 +68,10 @@ class TestSendInput:
         script = tmp_path / "script.py"
         script.touch()
         runner = PipelineRunner(script, Mock(), Mock())
-        
+
         # Not running
         assert runner.send_input("test") is False
-        
+
         # No process
         runner.is_running = True
         runner.process = None

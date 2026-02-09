@@ -10,7 +10,11 @@ from typing import List, Tuple
 
 from llm_config import create_llm_client
 from pipeline.code_utils import sanitize_code, validate_syntax, detect_hallucinations
-from pipeline.file_utils import gather_python_files, read_file_contents_chunked
+from pipeline.file_utils import (
+    gather_python_files,
+    read_file_contents_chunked,
+    truncate_at_boundary,
+)
 from pipeline.models import (
     ExecutionSummary,
     SecurityIssue,
@@ -20,10 +24,11 @@ from pipeline.models import (
 )
 from pipeline.prompts import (
     EVALUATION_SYSTEM_PROMPT,
+    HALLUCINATION_FIX_PROMPT,
     IDENTIFICATION_SYSTEM_PROMPT,
     IMPLEMENTATION_SYSTEM_PROMPT,
 )
-from pipeline.governance import governance_log
+from pipeline.governance import governance_log, FailureReason
 
 
 class BaseAgent:
@@ -281,6 +286,13 @@ Generate a complete, executable PyTest file."""
                     False,
                     f"Hallucination: {h['reason']}",
                 )
+            # Attempt to fix hallucinations
+            test_code = self.fix_hallucinations(test_code, hallucinations, codebase_path)
+            governance_log.log_failure(
+                FailureReason.HALLUCINATION,
+                f"{len(hallucinations)} hallucination(s) detected and corrected",
+                0,
+            )
 
         output_dir.mkdir(parents=True, exist_ok=True)
         test_file = output_dir / f"test_generated_{int(time.time())}.py"
@@ -316,10 +328,9 @@ Generate a complete, executable PyTest file."""
         python_files = gather_python_files(codebase_path)
         # Limit context size to prevent 413 errors - use chunked reading
         code_chunks = read_file_contents_chunked(python_files)
-        # Use first 10 chunks to keep under token limits
-        code_context = "\n\n".join(code_chunks[:10])[
-            :15000
-        ]  # Hard limit at 15000 chars
+        # Use first 10 chunks and truncate at logical boundary
+        raw_context = "\n\n".join(code_chunks[:10])
+        code_context = truncate_at_boundary(raw_context, 15000)
 
         # Build file list for the AI to understand the project structure
         file_list = "\n".join(f"  - {f.name}" for f in python_files)
@@ -438,6 +449,64 @@ Generate a complete, executable PyTest file that:
 
         print(f"   Updated: {existing_test_file}")
         return test_code, existing_test_file
+
+    def fix_hallucinations(
+        self, code: str, hallucinations: List[dict], codebase_path: Path
+    ) -> str:
+        """Uses LLM to fix hallucinated imports and symbols in generated code."""
+        print(f"   🔧 Fixing {len(hallucinations)} hallucination(s)...")
+
+        # Get list of actual modules and symbols from codebase
+        python_files = gather_python_files(codebase_path)
+        actual_modules = [f.stem for f in python_files]
+
+        # Extract actual function/class names from codebase for reference
+        actual_symbols = []
+        for file_path in python_files[:5]:  # Limit to first 5 files for performance
+            try:
+                from pipeline.code_utils import extract_code_definitions
+
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                definitions = extract_code_definitions(content, recursive=False)
+                actual_symbols.extend([d.name for d in definitions])
+            except Exception:
+                pass
+
+        # Format hallucinations for the prompt
+        hallucination_list = "\n".join(
+            f"- {h['name']}: {h['reason']}" for h in hallucinations
+        )
+
+        user_prompt = f"""Fix the following test code by replacing invalid imports and symbols.
+
+HALLUCINATIONS DETECTED:
+{hallucination_list}
+
+AVAILABLE MODULES IN CODEBASE:
+{', '.join(actual_modules)}
+
+AVAILABLE FUNCTIONS/CLASSES IN CODEBASE:
+{', '.join(set(actual_symbols)) if actual_symbols else 'None extracted'}
+
+CODE TO FIX:
+{truncate_at_boundary(code, 12000)}
+
+Return ONLY the corrected Python code."""
+
+        response = self.call_llm(
+            HALLUCINATION_FIX_PROMPT, user_prompt, agent_name="hallucination_fixer"
+        )
+        fixed_code = sanitize_code(response)
+
+        # Validate the fix didn't introduce syntax errors
+        is_valid, _, _ = validate_syntax(fixed_code)
+        if is_valid:
+            print("   ✓ Hallucinations fixed successfully")
+            return fixed_code
+        else:
+            print("   ⚠️ Fix introduced syntax errors, keeping original")
+            return code
 
     def fix_syntax_errors(
         self, code: str, error_msg: str, codebase_path: Path, error_details: dict = None

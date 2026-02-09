@@ -33,7 +33,7 @@ class TestLogParser:
         """Should extract test pass/fail counts."""
         result = parser.parse("Tests: 15/20 passed")
         assert result.tests == ("15", "20", 5)
-        
+
         result = parser.parse("tests: 10/10 PASSED")
         assert result.tests == ("10", "10", 0)
 

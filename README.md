@@ -114,8 +114,6 @@ python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <tar
 
 ### 4. VS Code Extension
 
-### 4. VS Code Extension
-
 Run the agentic testing pipeline directly within VS Code.
 
 **Prerequisites:**

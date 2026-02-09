@@ -1,10 +1,57 @@
 """File utility functions for the Python Testing Pipeline."""
 
 import os
+import re
 from pathlib import Path
 from typing import List
 
-__all__ = ["gather_python_files", "read_file_contents", "read_file_contents_chunked"]
+__all__ = [
+    "gather_python_files",
+    "read_file_contents",
+    "read_file_contents_chunked",
+    "truncate_at_boundary",
+]
+
+
+def truncate_at_boundary(code: str, max_chars: int) -> str:
+    """
+    Truncate code at a logical boundary (end of function/class or blank line).
+
+    Args:
+        code: Source code string to truncate
+        max_chars: Maximum character limit
+
+    Returns:
+        Truncated code ending at a logical boundary
+    """
+    if len(code) <= max_chars:
+        return code
+
+    # Get the substring up to max_chars
+    truncated = code[:max_chars]
+
+    # Try to find the last complete function/class definition
+    # Look for patterns like "\ndef " or "\nclass " that indicate a new definition
+    definition_pattern = re.compile(r"\n(?=def |class )", re.MULTILINE)
+    matches = list(definition_pattern.finditer(truncated))
+
+    if matches:
+        # Cut at the start of the last definition (keeping complete previous definitions)
+        last_def_start = matches[-1].start()
+        if last_def_start > max_chars // 2:  # Only if we're keeping at least half the content
+            return truncated[:last_def_start].rstrip() + "\n# ... (truncated)"
+
+    # Fallback: find the last blank line (double newline)
+    last_blank = truncated.rfind("\n\n")
+    if last_blank > max_chars // 2:
+        return truncated[:last_blank].rstrip() + "\n# ... (truncated)"
+
+    # Final fallback: find the last newline
+    last_newline = truncated.rfind("\n")
+    if last_newline > 0:
+        return truncated[:last_newline].rstrip() + "\n# ... (truncated)"
+
+    return truncated + "\n# ... (truncated)"
 
 
 def gather_python_files(codebase_path: Path) -> List[Path]:

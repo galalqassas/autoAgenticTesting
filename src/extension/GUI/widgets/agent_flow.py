@@ -124,7 +124,7 @@ class AgentFlow(ctk.CTkFrame):
         """Show end marker with flag icon."""
         if self._nodes:
             self._set_node_state(self._nodes[-1], "completed")
-        
+
         # Arrow
         arrow = ctk.CTkFrame(self.container, fg_color="transparent")
         arrow.pack(side="left", padx=2)
@@ -132,23 +132,23 @@ class AgentFlow(ctk.CTkFrame):
             arrow, text="→", font=ctk.CTkFont(size=18, weight="bold"),
             text_color=COLORS["border"]
         ).pack(pady=(0, 18))
-        
+
         # End icon node
         end_frame = ctk.CTkFrame(self.container, fg_color="transparent")
         end_frame.pack(side="left", padx=4)
-        
+
         icon_frame = ctk.CTkFrame(
             end_frame, width=40, height=40, corner_radius=20,
             fg_color=COLORS["accent_green"], border_width=2, border_color=COLORS["accent_green"]
         )
         icon_frame.pack(pady=(0, 4))
         icon_frame.pack_propagate(False)
-        
+
         ctk.CTkLabel(
             icon_frame, text="✓", font=ctk.CTkFont(size=16),
             text_color=COLORS["text_primary"]
         ).place(relx=0.5, rely=0.5, anchor="center")
-        
+
         ctk.CTkLabel(
             end_frame, text="Done", font=ctk.CTkFont(size=10),
             text_color=COLORS["accent_green"]

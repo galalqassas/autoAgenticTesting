@@ -43,7 +43,7 @@ def _group_lines_to_ranges(lines: List[int]) -> str:
     """Group consecutive line numbers into ranges like '5-10, 15, 20-25'."""
     if not lines:
         return ""
-    
+
     ranges, start, end = [], lines[0], lines[0]
     for line in lines[1:]:
         if line == end + 1:

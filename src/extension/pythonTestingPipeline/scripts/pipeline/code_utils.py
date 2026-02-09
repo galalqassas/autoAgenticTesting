@@ -78,29 +78,29 @@ def validate_syntax(code: str) -> Tuple[bool, str, Optional[dict]]:
 def sanitize_code(code: str) -> str:
     """Remove markdown formatting and ensure valid Python code."""
     code = code.strip()
-    
+
     # Remove markdown code blocks
     if code.startswith("```"):
         code = code.split("\n", 1)[-1] if "\n" in code else code[3:]
     if code.endswith("```"):
         code = code[:-3].rstrip()
-    
+
     # Extract from inline code blocks
     if "```" in code:
         match = re.search(r"```(?:python)?\s*([\s\S]*?)```", code)
         if match:
             code = match.group(1).strip()
-    
+
     return code.strip("`").strip()
 
 
 def detect_hallucinations(generated_code: str, codebase_path: Path) -> List[dict]:
     """Detect hallucinated imports, functions, or classes in LLM-generated code."""
     hallucinations = []
-    
+
     # Build knowledge of actual codebase
     existing_modules, existing_symbols = set(), set()
-    
+
     if codebase_path.exists():
         for py_file in codebase_path.rglob("*.py"):
             if "__pycache__" in str(py_file) or "test" in py_file.stem.lower():
@@ -131,13 +131,13 @@ def detect_hallucinations(generated_code: str, codebase_path: Path) -> List[dict
     try:
         tree = ast.parse(generated_code)
         imported_names = set()
-        
+
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 imported_names.update(alias.asname or alias.name.split(".")[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom):
                 imported_names.update(alias.asname or alias.name for alias in node.names)
-        
+
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 name = node.func.id

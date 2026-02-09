@@ -3,7 +3,8 @@
 Python Automated Testing Pipeline
 
 Usage:
-    python pythonTestingPipeline.py <codebase_path> [--coverage] [--auto-approve] [--no-run-tests]
+    python pythonTestingPipeline.py <codebase_path> [--coverage] [--auto-approve] \\
+        [--no-run-tests]
 
 Note:
     Generated tests are run by default unless --no-run-tests is supplied.
@@ -42,7 +43,7 @@ from pipeline.agents import (
     ImplementationAgent,
     EvaluationAgent,
 )
-from pipeline.governance import governance_log
+from pipeline.governance import governance_log, FailureReason
 
 
 # ==================== Pipeline Implementation ====================
@@ -52,7 +53,7 @@ class PythonTestingPipeline:
     """Orchestrates the three-agent testing pipeline."""
 
     def __init__(self, model: Optional[str] = None):
-        # Use the LLM client from llm_config for automatic API key rotation and model fallback
+        # Use LLM client from llm_config for auto API key rotation and model fallback
         self.llm_client = create_llm_client(use_mock_on_failure=False)
         self.prompt_history = []  # Track all prompts for later analysis
 
@@ -129,8 +130,8 @@ Be concise and professional."""
         status_icon = "✅" if results.get("status") == "completed" else "❌"
         report = f"""# Test Pipeline Report
 
-**Status:** {status_icon} {results.get("status", "unknown").upper()}  
-**Generated:** {time_module.strftime("%Y-%m-%d %H:%M:%S")}  
+**Status:** {status_icon} {results.get("status", "unknown").upper()}
+**Generated:** {time_module.strftime("%Y-%m-%d %H:%M:%S")}
 **Model:** {self.model}
 
 ## Summary
@@ -197,7 +198,7 @@ Be concise and professional."""
         return report_file
 
     def identify_test_scenarios(self, codebase_path: Path) -> TestScenariosOutput:
-        """Agent 1: Identifies test scenarios from the codebase using parallel processing."""
+        """Agent 1: Identifies test scenarios from codebase using parallel processing."""
         return self.identification_agent.run(codebase_path)
 
     def interpret_user_input(
@@ -211,10 +212,10 @@ Be concise and professional."""
         prompt = f"""Scenarios:\n{scenario_list}\n\nUser said: "{user_input}"
 
 Determine intent. Return JSON:
-{{"action": "approve"|"remove"|"refine", "indices": [1,2,...] if removing, "feedback": "..." if refining}}"""
+{{"action": "approve"|"remove"|"refine", "indices": [1,2,...] if removing, "feedback": "..."}}"""
         try:
             response, _ = self.llm_client.call(
-                sys_p="Interpret user intent for test scenario approval. Return only valid JSON.",
+                sys_p="Interpret intent for test scenario approval. Return valid JSON.",
                 usr_p=prompt,
             )
             match = re.search(r"\{[^{}]*\}", response)
@@ -271,7 +272,7 @@ Determine intent. Return JSON:
                 icon = {"High": "!", "Medium": "~", "Low": "."}.get(s.priority, " ")
                 print(f"  {i}. [{icon}] {s.scenario_description}")
             print(
-                f"\n  Total: {len(scens.test_scenarios)} | Type anything to proceed or provide feedback"
+                f"\n  Total: {len(scens.test_scenarios)} | Type anything to proceed/feedback"
             )
             print("-" * 60)
 
@@ -354,7 +355,7 @@ Determine intent. Return JSON:
         syntax_errors: str = "",
         security_issues: list = None,
     ) -> tuple[str, Path]:
-        """Generates additional tests to improve coverage and address security issues."""
+        """Generates additional tests to improve coverage and fix security issues."""
         return self.implementation_agent.improve_tests(
             codebase_path,
             existing_test_file,
@@ -447,7 +448,7 @@ Determine intent. Return JSON:
                     has_severe_security = evaluation.has_severe_security_issues
                     security_issues = evaluation.security_issues
 
-                    # Check completion criteria: coverage >= 90% AND no severe security issues
+                    # Check completion criteria: >= 90% coverage AND no severe issues
                     coverage_met = current_coverage >= target_coverage
                     security_met = not has_severe_security
 
@@ -482,7 +483,7 @@ Determine intent. Return JSON:
                     progress_made = False
                     if current_coverage > best_coverage:
                         best_coverage = current_coverage
-                        # Snapshot the current test code (strings are immutable, so assignment is safe)
+                        # Snapshot current test code (strings are immutable, so safe)
                         best_test_code = current_test_code
                         progress_made = True
 
@@ -497,7 +498,7 @@ Determine intent. Return JSON:
 
                     if consecutive_no_progress >= 5:
                         print(
-                            f"\n⚠️  No progress made for {consecutive_no_progress} iterations. Stopping early to prevent infinite loop."
+                            f"\n⚠️  No progress limits for {consecutive_no_progress} iterations. Stopping."
                         )
                         print(f"   Best coverage: {best_coverage:.1f}%")
                         print(f"   Lowest severe issues: {best_severe_count}")
@@ -509,6 +510,11 @@ Determine intent. Return JSON:
                         status_parts.append(
                             f"coverage {current_coverage:.1f}% < {target_coverage}%"
                         )
+                        governance_log.log_failure(
+                            FailureReason.COVERAGE_LOW,
+                            f"Coverage {current_coverage:.1f}% < {target_coverage}%",
+                            iteration,
+                        )
                     if not security_met:
                         severe_count = sum(
                             1
@@ -516,6 +522,11 @@ Determine intent. Return JSON:
                             if si.severity in ("critical", "high")
                         )
                         status_parts.append(f"{severe_count} severe security issue(s)")
+                        governance_log.log_failure(
+                            FailureReason.SECURITY_ISSUE,
+                            f"{severe_count} severe security issue(s)",
+                            iteration,
+                        )
                     print(f"   ⚠️  Needs improvement: {', '.join(status_parts)}")
 
                     # Extract uncovered areas from test output
@@ -535,6 +546,9 @@ Determine intent. Return JSON:
                             syntax_errors = syntax_match.group(1)
                         else:
                             syntax_errors = "SyntaxError detected in test file"
+                        governance_log.log_failure(
+                            FailureReason.SYNTAX_ERROR, syntax_errors, iteration
+                        )
 
                     # Generate additional tests with coverage and security feedback
                     current_test_code, current_test_file = (
@@ -607,7 +621,7 @@ Determine intent. Return JSON:
                 except Exception as e:
                     print(f"   ⚠️ Could not save coverage report: {e}")
 
-            # Export governance audit trail (transparency, explainability, accountability)
+            # Export governance audit trail (transparency, accountability)
             governance_file = governance_log.export_audit_trail(
                 output_dir / f"governance_{run_id}.json"
             )
@@ -632,7 +646,7 @@ Determine intent. Return JSON:
 
             print(f"   Prompts used: {len(self.prompt_history)}")
             print(
-                f"   Total time: {total_time:.1f}s ({len(iteration_times)} iteration(s))"
+                f"   Total time: {total_time:.1f}s ({len(iteration_times)} iterations)"
             )
             print(f"   Report: {report_file}")
 
