@@ -38,7 +38,7 @@ export class Lazy<T> {
 			try {
 				this._value = this.executor();
 			} catch (err) {
-				this._error = err;
+				this._error = err as Error;
 			} finally {
 				this._state = LazyValueState.Completed;
 			}

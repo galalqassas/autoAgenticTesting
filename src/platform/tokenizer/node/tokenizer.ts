@@ -17,6 +17,8 @@ import { basename, join } from '../../../util/vs/base/common/path';
 import { ITelemetryService } from '../../telemetry/common/telemetry';
 import { TikTokenImpl } from './tikTokenizerImpl';
 
+type TimeoutHandle = any;
+
 export const ITokenizerProvider = createServiceIdentifier<ITokenizerProvider>('ITokenizerProvider');
 
 export interface TokenizationEndpoint {
@@ -157,7 +159,7 @@ class BPETokenizer extends Disposable implements ITokenizer {
 			case Raw.ChatCompletionContentPartKind.CacheBreakpoint:
 				return 0;
 			default:
-				assertNever(text, `unknown content part (${JSON.stringify(text)})`);
+				assertNever(text as never, `unknown content part (${JSON.stringify(text)})`);
 		}
 	}
 
@@ -307,7 +309,7 @@ class BPETokenizer extends Disposable implements ITokenizer {
 					timeout = setTimeout(() => cleanup.dispose(), 15000);
 
 					if (Math.random() < 1 / 1000) {
-						worker.proxy.resetStats().then(stats => {
+						worker.proxy.resetStats().then((stats: any) => {
 							/* __GDPR__
 								"tokenizer.stats" : {
 									"owner": "jrieken",

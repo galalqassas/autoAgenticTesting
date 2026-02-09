@@ -29,7 +29,7 @@ export class Capabilities extends PromptElement<CapabilitiesProps, CapabilitiesS
 	}
 
 	private getIntentDescription(id: string) {
-		const intent = this.commandService.getCommand(id, this.props.location)?.intent;
+		const intent = (this.commandService as any).getCommand(id, this.props.location)?.intent;
 		return !intent || intent.isListedCapability === false ? undefined : intent.description;
 	}
 

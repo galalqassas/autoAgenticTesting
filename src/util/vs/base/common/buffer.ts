@@ -131,7 +131,7 @@ export class VSBuffer {
 			if (!textDecoder) {
 				textDecoder = new TextDecoder();
 			}
-			return textDecoder.decode(this.buffer);
+			return textDecoder!.decode(this.buffer);
 		}
 	}
 

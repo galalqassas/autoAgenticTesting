@@ -27,14 +27,14 @@ export function getTextPart(message: string | Raw.ChatCompletionContentPart[] | 
 }
 
 
-export function toTextPart(message: string): Raw.ChatCompletionContentPartText {
+export function toTextPart(message: string): Raw.ChatCompletionContentPart {
 	return {
 		type: Raw.ChatCompletionContentPartKind.Text,
 		text: message
 	};
 }
 
-export function toTextParts(message: string): Raw.ChatCompletionContentPartText[] {
+export function toTextParts(message: string): Raw.ChatCompletionContentPart[] {
 	return [toTextPart(message)];
 }
 
@@ -49,6 +49,6 @@ export function roleToString(role: Raw.ChatRole): 'system' | 'user' | 'assistant
 		case Raw.ChatRole.Tool:
 			return 'tool';
 		default:
-			assertNever(role, `unknown role (${role})`);
+			assertNever(role as never, `unknown role (${role})`);
 	}
 }

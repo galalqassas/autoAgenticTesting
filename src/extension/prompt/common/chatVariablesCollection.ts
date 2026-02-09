@@ -53,9 +53,9 @@ export class ChatVariablesCollection {
 				const variable = this._source[i];
 				// Rewrite the message to use the variable header name
 				if (variable.value) {
-					const originalName = variable.name;
+					const originalName = variable.name ?? '';
 					const uniqueName = this.uniqueFileName(originalName, this._source.slice(0, i));
-					this._variables.push({ reference: variable, originalName, uniqueName, value: variable.value, range: variable.range, isMarkedReadonly: variable.isReadonly });
+					this._variables.push({ reference: variable, originalName, uniqueName: uniqueName ?? '', value: variable.value, range: variable.range, isMarkedReadonly: variable.isReadonly });
 				}
 			}
 		}

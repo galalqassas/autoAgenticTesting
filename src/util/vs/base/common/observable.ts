@@ -1,10 +1,15 @@
-//!!! DO NOT modify, this file was COPIED from 'microsoft/vscode'
-
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
-// This is a facade for the observable implementation. Only import from here!
-
-export * from './observableInternal/index';
+export interface IObservable<T, TChange = unknown> {
+	get(): T;
+	addObserver(observer: IObserver): void;
+	removeObserver(observer: IObserver): void;
+	reportChanges(): void;
+}
+export interface IObservableWithChange<T, TChange> extends IObservable<T, TChange> {}
+export interface IObserver {
+	beginUpdate<T>(observable: IObservable<T>): void;
+	endUpdate<T>(observable: IObservable<T>): void;
+	handlePossibleChange<T>(observable: IObservable<T>): void;
+	handleChange<T, TChange>(observable: IObservable<T>, change: TChange): void;
+}
+export const observableValue: any = () => {};
+export const transaction: any = () => {};

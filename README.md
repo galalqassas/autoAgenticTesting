@@ -80,8 +80,6 @@ The most user-friendly way to run the pipeline.
 4.  **Monitor**: Watch the "Agent Flow" tab for real-time progress and "Console" for logs.
 5.  **Review**: Check the "Report" tab for final results, coverage stats, and security findings.
 
-
-
 ### 2. REST API Server
 
 Start the backend service to integrate with other tools or build your own UI.
@@ -116,8 +114,31 @@ python src/extension/pythonTestingPipeline/scripts/pythonTestingPipeline.py <tar
 
 ### 4. VS Code Extension
 
-(Requires building the extension)
+### 4. VS Code Extension
 
-1.  Navigate to root and run `npm install && npm run compile`.
-2.  Open Debug panel (F5) to launch the Extension Host.
-3.  Command: `Agentic Testing: Generate Tests`.
+Run the agentic testing pipeline directly within VS Code.
+
+**Prerequisites:**
+
+- Node.js (v18+)
+- NPM
+
+**Steps:**
+
+1.  **Install Dependencies**:
+
+    ```bash
+    npm install
+
+    # Compile the extension source code
+    npm run compile
+    ```
+
+2.  **Launch Extension**:
+    - Open the project in VS Code.
+    - Press `F5` to start debugging. This opens a new "Extension Development Host" window.
+
+3.  **Run Command**:
+    - In the new window, open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
+    - Type and select: `Agentic Testing: Generate Tests`.
+    - Follow the prompts to select your target codebase.

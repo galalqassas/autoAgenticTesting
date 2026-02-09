@@ -75,7 +75,7 @@ export class Turn {
 			new ChatVariablesCollection(request.references),
 			request.toolReferences.map(InternalToolReference.from),
 			request.editedFileEvents,
-			request.acceptedConfirmationData,
+			request.acceptedConfirmationData as unknown[] | undefined,
 			isToolCallLimitAcceptance(request) || isContinueOnError(request),
 		);
 	}
@@ -378,6 +378,6 @@ export class GlobalContextMessageMetadata {
 }
 
 export function getGlobalContextCacheKey(accessor: ServicesAccessor): string {
-	const workspaceService = accessor.get(IWorkspaceService);
-	return workspaceService.getWorkspaceFolders().map(folder => folder.toString()).join(',');
+	const workspaceService = accessor.get(IWorkspaceService) as IWorkspaceService;
+	return workspaceService.getWorkspaceFolders().map((folder: any) => folder.toString()).join(',');
 }

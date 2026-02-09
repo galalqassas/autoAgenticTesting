@@ -59,7 +59,7 @@ export class SSEParser {
 	private buffer: Uint8Array[] = [];
 	private endedOnCR = false;
 	private readonly onEventHandler: SSEEventHandler;
-	private readonly decoder: TextDecoder;
+	private readonly decoder: InstanceType<typeof TextDecoder>;
 	/**
 	 * Creates a new SSE parser.
 	 * @param onEvent The callback to invoke when an event is dispatched.

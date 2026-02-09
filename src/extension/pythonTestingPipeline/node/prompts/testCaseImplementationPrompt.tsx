@@ -30,6 +30,9 @@ export interface TestCaseImplementationPromptProps extends BasePromptElementProp
  * Generates PyTest test scripts from approved test scenarios.
  */
 export class TestCaseImplementationPrompt extends PromptElement<TestCaseImplementationPromptProps> {
+	priority = 0;
+	insertLineBreakBefore = false;
+
 	override render(_state: void, _sizing: PromptSizing): PromptPiece {
 		const { scenarios, codeContext, filePaths, existingTestCode, uncoveredAreas, securityIssues } = this.props;
 		const isImprovement = !!existingTestCode;

@@ -31,6 +31,8 @@ export async function toolTSX(insta: IInstantiationService, options: vscode.Lang
 	return new LanguageModelToolResult([
 		new LanguageModelPromptTsxPart(
 			await renderPromptElementJSON(insta, class extends PromptElement {
+				priority = 0;
+				insertLineBreakBefore = false;
 				render() {
 					return piece;
 				}
@@ -107,8 +109,8 @@ export async function assertFileOkForTool(accessor: ServicesAccessor, uri: URI):
 
 	await assertFileNotContentExcluded(accessor, uri);
 
-	if (!workspaceService.getWorkspaceFolder(normalizePath(uri)) && !customInstructionsService.isExternalInstructionsFile(uri) && uri.scheme !== Schemas.untitled) {
-		const fileOpenInSomeTab = tabsAndEditorsService.tabs.some(tab => isEqual(tab.uri, uri));
+	if (!(workspaceService as any).getWorkspaceFolder(normalizePath(uri)) && !(customInstructionsService as any).isExternalInstructionsFile(uri) && uri.scheme !== Schemas.untitled) {
+		const fileOpenInSomeTab = (tabsAndEditorsService as any).tabs.some((tab: any) => isEqual(tab.uri, uri));
 		if (!fileOpenInSomeTab) {
 			throw new Error(`File ${promptPathRepresentationService.getFilePath(uri)} is outside of the workspace, and not open in an editor, and can't be read`);
 		}
@@ -119,7 +121,7 @@ export async function assertFileNotContentExcluded(accessor: ServicesAccessor, u
 	const ignoreService = accessor.get(IIgnoreService);
 	const promptPathRepresentationService = accessor.get(IPromptPathRepresentationService);
 
-	if (await ignoreService.isCopilotIgnored(uri)) {
+	if (await (ignoreService as any).isCopilotIgnored(uri)) {
 		throw new Error(`File ${promptPathRepresentationService.getFilePath(uri)} is configured to be ignored by Copilot`);
 	}
 }

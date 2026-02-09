@@ -5,7 +5,7 @@
 
 import { PromptElement, PromptElementProps } from '@vscode/prompt-tsx';
 import { ConfigKey, IConfigurationService } from '../../../../platform/configuration/common/configurationService';
-import { IEnvService } from '../../../../platform/env/common/envService';
+import { IEnvService } from 'platform/env/common/envService';
 
 export const validLocales = [
 	"auto",
@@ -36,7 +36,7 @@ export class ResponseTranslationRules extends PromptElement {
 	}
 
 	render() {
-		const languageOverride = this.configurationService.getConfig<string>(ConfigKey.LocaleOverride); // Locale overrides must be for one of our supported languages
+		const languageOverride = (this.configurationService as any).getConfig(ConfigKey.LocaleOverride) as string; // Locale overrides must be for one of our supported languages
 		if (!validLocales.find((locale) => languageOverride === locale)) {
 			return undefined;
 		}

@@ -32,3 +32,8 @@ export function createSingleCallFunction<T extends Function>(this: unknown, fn: 
 		return result;
 	} as unknown as T;
 }
+
+/**
+ * @deprecated Use {@link createSingleCallFunction} instead.
+ */
+export const once = createSingleCallFunction;

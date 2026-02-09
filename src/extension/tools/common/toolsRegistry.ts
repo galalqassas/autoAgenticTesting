@@ -78,8 +78,8 @@ export interface ICopilotToolExtensionCtor {
 }
 
 export const ToolRegistry = new class {
-	private _tools: Array<ICopilotToolCtor> = [];
-	private _toolExtensions: Array<ICopilotToolExtensionCtor> = [];
+	/* @internal */ _tools: Array<ICopilotToolCtor> = [];
+	/* @internal */ _toolExtensions: Array<ICopilotToolExtensionCtor> = [];
 
 	public registerTool(tool: ICopilotToolCtor) {
 		this._tools.push(tool);

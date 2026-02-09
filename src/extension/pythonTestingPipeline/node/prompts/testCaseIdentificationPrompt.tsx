@@ -21,6 +21,9 @@ export interface TestCaseIdentificationPromptProps extends BasePromptElementProp
  * Analyzes Python code and identifies comprehensive test scenarios.
  */
 export class TestCaseIdentificationPrompt extends PromptElement<TestCaseIdentificationPromptProps> {
+	priority = 0;
+	insertLineBreakBefore = false;
+
 	override render(_state: void, _sizing: PromptSizing): PromptPiece {
 		const { codeContent, filePaths } = this.props;
 

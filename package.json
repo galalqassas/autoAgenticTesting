@@ -1,6 +1,7 @@
 {
 	"name": "agentic-testing",
 	"displayName": "Agentic Testing Pipeline",
+	"publisher": "galalqassas",
 	"description": "AI-powered automated Python testing pipeline with three specialized agents for test generation, implementation, and evaluation",
 	"version": "1.0.0",
 	"author": "galalqassas",
@@ -13,7 +14,6 @@
 		"node": ">=18.0.0",
 		"vscode": "^1.80.0"
 	},
-	"activationEvents": [],
 	"dependencies": {
 		"@vscode/copilot-api": "^0.2.12",
 		"@vscode/l10n": "^0.0.18",
@@ -25,6 +25,17 @@
 		"watch": "tsc -watch -p ./",
 		"lint": "eslint src --ext ts,tsx",
 		"test": "vitest run"
+	},
+	"activationEvents": [
+		"onCommand:agentic-testing.generateTests"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"command": "agentic-testing.generateTests",
+				"title": "Agentic Testing: Generate Tests"
+			}
+		]
 	},
 	"devDependencies": {
 		"@types/node": "^18.0.0",

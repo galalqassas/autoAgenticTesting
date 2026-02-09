@@ -5,8 +5,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-env/
-ENV/
+/env/
+/ENV/
 .pytest_cache/
 .coverage
 .coveragerc

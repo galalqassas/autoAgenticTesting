@@ -130,6 +130,26 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
 
+  test-extension:
+    name: 🧩 Extension Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Compilation
+        run: npm run compile -- --noEmit
+
+      - name: Run Extension Tests
+        run: npm test
+
   # ──────────────────────────────────────────────────────────────────────────────
   # DOCKER BUILD & SCAN (waits for all validation jobs to pass)
   # ──────────────────────────────────────────────────────────────────────────────
@@ -137,7 +157,7 @@ jobs:
     name: 🐳 Docker Build & Scan
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [security, quality, test-agents, test-gui]
+    needs: [security, quality, test-agents, test-gui, test-extension]
     steps:
       - uses: actions/checkout@v4
 

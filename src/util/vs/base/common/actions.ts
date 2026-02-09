@@ -191,7 +191,7 @@ export class ActionRunner extends Disposable implements IActionRunner {
 		try {
 			await this.runAction(action, context);
 		} catch (e) {
-			error = e;
+			error = e as Error;
 		}
 
 		this._onDidRun.fire({ action, error });

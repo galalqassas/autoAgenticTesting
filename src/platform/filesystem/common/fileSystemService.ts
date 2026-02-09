@@ -37,7 +37,7 @@ export interface IFileSystemService extends FileSystem {
  * This is disabled in production.
  */
 export const fileSystemServiceReadAsJSON = new class {
-	private _cache: LRUCache<any> | null = null;
+	/* @internal */ _cache: LRUCache<any> | null = null;
 
 	enable(): void {
 		this._cache = new LRUCache<any>(10);
@@ -56,7 +56,7 @@ export const fileSystemServiceReadAsJSON = new class {
 		return value;
 	}
 
-	private async _readJSON<T>(fileSystemService: IFileSystemService, uri: Uri): Promise<T> {
+	/* @internal */ async _readJSON<T>(fileSystemService: IFileSystemService, uri: Uri): Promise<T> {
 		const buffer = await fileSystemService.readFile(uri, true);
 		return JSON.parse(buffer.toString()) as T;
 	}

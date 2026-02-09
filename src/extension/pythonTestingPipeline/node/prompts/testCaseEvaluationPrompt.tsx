@@ -24,6 +24,9 @@ export interface TestCaseEvaluationPromptProps extends BasePromptElementProps {
  * Analyzes test execution results, performs security analysis, and provides actionable recommendations.
  */
 export class TestCaseEvaluationPrompt extends PromptElement<TestCaseEvaluationPromptProps> {
+	priority = 0;
+	insertLineBreakBefore = false;
+
 	override render(_state: void, _sizing: PromptSizing): PromptPiece {
 		const { testResult, approvedScenarios, sourceCode } = this.props;
 

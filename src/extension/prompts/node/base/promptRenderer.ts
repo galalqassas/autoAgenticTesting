@@ -131,7 +131,7 @@ export class PromptRenderer<P extends BasePromptElementProps> extends BasePrompt
 			}
 		}
 
-		const references = result.references.filter(ref => this.validateReference(ref));
+		const references = result.references.filter((ref: any) => this.validateReference(ref));
 		this._instantiationService.dispose(); // Dispose the hydrated instantiation service
 		return { ...result, references: getUniqueReferences(references) };
 	}
@@ -188,8 +188,8 @@ class PromptRendererForJSON<P extends BasePromptElementProps> extends BasePrompt
 				throw new Error('Tools may only return text, not messages.');
 			},
 			tokenLength(text, token) {
-				if (text.type === Raw.ChatCompletionContentPartKind.Text) {
-					return Promise.resolve(tokenOptions?.countTokens(text.text, token) ?? Promise.resolve(1));
+			if ((text as any).type === Raw.ChatCompletionContentPartKind.Text) {
+				return Promise.resolve(tokenOptions?.countTokens((text as any).text, token) ?? Promise.resolve(1));
 				} else {
 					return Promise.resolve(1);
 				}

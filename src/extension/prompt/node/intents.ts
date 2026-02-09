@@ -314,8 +314,8 @@ export function applyEdits(text: string, edits: TextEdit[]): string {
 
 export type LeadingMarkdownStreaming = StreamPipe<string>;
 export const LeadingMarkdownStreaming = {
-	Mute: StreamPipe.discard<string>(),
-	Emit: StreamPipe.identity<string>(),
+	Mute: StreamPipe.discard() as StreamPipe<string>,
+	Emit: StreamPipe.identity() as StreamPipe<string>,
 };
 
 export const enum EarlyStopping {
@@ -345,7 +345,7 @@ export class StreamingEditsController {
 		const leadingMarkdown = new AsyncIterableSource<string>();
 
 		const processedMarkdown = this._leadingMarkdownStreamPipe(leadingMarkdown.asyncIterable);
-		forEachStreamed(processedMarkdown, item => this._outputStream.markdown(item));
+		forEachStreamed(processedMarkdown, (item: string) => this._outputStream.markdown(item));
 
 		const firstCodeBlockText = new AsyncIterableSource<string>();
 		const firstCodeBlockLines = streamLines(firstCodeBlockText.asyncIterable);
@@ -356,15 +356,15 @@ export class StreamingEditsController {
 
 		// Read all the markdown pieces until the first code block
 		await reader.readWhile(
-			piece => piece.kind === TextPieceKind.OutsideCodeBlock,
-			piece => leadingMarkdown.emitOne(piece.value)
+			(piece: ClassifiedTextPiece) => piece.kind === TextPieceKind.OutsideCodeBlock,
+			(piece: ClassifiedTextPiece) => leadingMarkdown.emitOne(piece.value)
 		);
 		leadingMarkdown.resolve();
 
 		// Read the first code block
 		await reader.readWhile(
-			piece => piece.kind === TextPieceKind.InsideCodeBlock,
-			piece => firstCodeBlockText.emitOne(piece.value)
+			(piece: ClassifiedTextPiece) => piece.kind === TextPieceKind.InsideCodeBlock,
+			(piece: ClassifiedTextPiece) => firstCodeBlockText.emitOne(piece.value)
 		);
 
 		this._leftFirstCodeBlock = true;
