@@ -16,6 +16,7 @@ class Decision:
     rationale: str
     confidence: float
     inputs_used: dict
+    risk_level: str = "low"  # low, medium, high, critical
 
 
 @dataclass
@@ -43,6 +44,7 @@ class GovernanceLog:
         rationale: str,
         confidence: float = 0.8,
         inputs_used: dict = None,
+        risk_level: str = "low",
     ) -> Decision:
         """Log decision with transparency metadata."""
         record = Decision(
@@ -52,6 +54,7 @@ class GovernanceLog:
             rationale=rationale,
             confidence=confidence,
             inputs_used=inputs_used or {},
+            risk_level=risk_level,
         )
         self.decisions.append(record)
         return record

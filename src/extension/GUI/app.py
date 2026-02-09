@@ -35,6 +35,12 @@ class PipelineGUI(ctk.CTk):
         ("Tests", "--", "Waiting...", COLORS["accent_blue"]),
         ("Security", "0", "No issues", COLORS["accent_red"]),
     ]
+    TAB_CONFIG = [
+        ("pipeline", "🔧 Pipeline"),
+        ("prompts", "💬 Prompts"),
+        ("report", "📊 Report"),
+        ("coverage", "📊 Coverage"),
+    ]
 
     def __init__(self):
         super().__init__()
@@ -45,7 +51,7 @@ class PipelineGUI(ctk.CTk):
     def _setup_window(self):
         """Configure window properties."""
         self.title("AutoTest - Python Testing Pipeline")
-        self.geometry("1200x800")
+        self.geometry("1200x900")
         self.minsize(1000, 700)
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -61,7 +67,9 @@ class PipelineGUI(ctk.CTk):
             / "scripts"
             / "pythonTestingPipeline.py"
         )
-        self.runner = PipelineRunner(script_path, self._on_output, self._on_complete)
+        self.runner = PipelineRunner(
+            script_path, self._on_output, self._on_complete
+        )
         self.parser = LogParser()
         self.stats_cards = {}
         self.latest_prompts_file = None  # Track prompts file from pipeline
@@ -153,7 +161,9 @@ class PipelineGUI(ctk.CTk):
         """Build the main content area with tabbed interface."""
         # Main container
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_container.pack(fill="both", expand=True, padx=24, pady=(12, 24))
+        self.main_container.pack(
+            fill="both", expand=True, padx=24, pady=(12, 24)
+        )
 
         # Tab bar
         self._build_tab_bar(self.main_container)
@@ -198,62 +208,33 @@ class PipelineGUI(ctk.CTk):
         tab_inner.pack(side="left", padx=8, pady=6)
 
         self.tab_buttons = {}
+        for i, (name, text) in enumerate(self.TAB_CONFIG):
+            is_default = i == 0
+            btn = self._create_tab_button(tab_inner, name, text, is_default)
+            btn.pack(side="left", padx=(0, 4))
+            self.tab_buttons[name] = btn
 
-        # Pipeline tab button
-        self.tab_buttons["pipeline"] = ctk.CTkButton(
-            tab_inner,
-            text="🔧 Pipeline",
+    def _create_tab_button(
+        self, parent, name: str, text: str, is_default: bool
+    ):
+        """Create a tab button with consistent styling."""
+        return ctk.CTkButton(
+            parent,
+            text=text,
             width=120,
             height=32,
-            fg_color=COLORS["button_primary"],
-            hover_color=COLORS["button_hover"],
-            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color=(
+                COLORS["button_primary"] if is_default else COLORS["bg_dark"]
+            ),
+            hover_color=(
+                COLORS["button_hover"] if is_default else COLORS["border"]
+            ),
+            font=ctk.CTkFont(
+                size=13, weight="bold" if is_default else "normal"
+            ),
             corner_radius=8,
-            command=lambda: self._show_tab("pipeline"),
+            command=lambda n=name: self._show_tab(n),
         )
-        self.tab_buttons["pipeline"].pack(side="left", padx=(0, 4))
-
-        # Prompts tab button
-        self.tab_buttons["prompts"] = ctk.CTkButton(
-            tab_inner,
-            text="💬 Prompts",
-            width=120,
-            height=32,
-            fg_color=COLORS["bg_dark"],
-            hover_color=COLORS["border"],
-            font=ctk.CTkFont(size=13),
-            corner_radius=8,
-            command=lambda: self._show_tab("prompts"),
-        )
-        self.tab_buttons["prompts"].pack(side="left", padx=(0, 4))
-
-        # Report tab button
-        self.tab_buttons["report"] = ctk.CTkButton(
-            tab_inner,
-            text="📊 Report",
-            width=120,
-            height=32,
-            fg_color=COLORS["bg_dark"],
-            hover_color=COLORS["border"],
-            font=ctk.CTkFont(size=13),
-            corner_radius=8,
-            command=lambda: self._show_tab("report"),
-        )
-        self.tab_buttons["report"].pack(side="left", padx=(0, 4))
-
-        # Coverage tab button
-        self.tab_buttons["coverage"] = ctk.CTkButton(
-            tab_inner,
-            text="📊 Coverage",
-            width=120,
-            height=32,
-            fg_color=COLORS["bg_dark"],
-            hover_color=COLORS["border"],
-            font=ctk.CTkFont(size=13),
-            corner_radius=8,
-            command=lambda: self._show_tab("coverage"),
-        )
-        self.tab_buttons["coverage"].pack(side="left", padx=(0, 4))
 
     def _show_tab(self, tab_name: str):
         """Switch to the specified tab."""
@@ -319,7 +300,9 @@ class PipelineGUI(ctk.CTk):
 
     def _build_console(self, parent):
         """Build the log console."""
-        frame = ctk.CTkFrame(parent, fg_color=COLORS["bg_card"], corner_radius=12)
+        frame = ctk.CTkFrame(
+            parent, fg_color=COLORS["bg_card"], corner_radius=12
+        )
         frame.pack(fill="both", expand=True)
 
         header = ctk.CTkFrame(frame, fg_color="transparent", height=40)
@@ -343,19 +326,11 @@ class PipelineGUI(ctk.CTk):
             command=self._clear_log,
         ).pack(side="right")
 
-        self.log_text = ctk.CTkTextbox(
-            frame,
-            fg_color=COLORS["bg_console"],
-            text_color=COLORS["accent_green"],
-            font=ctk.CTkFont(family="Consolas", size=12),
-            corner_radius=8,
-        )
-        self.log_text.pack(fill="both", expand=True, padx=16, pady=(8, 8))
-        self.log_text.configure(state="disabled")
-
-        # Input area for sending commands to pipeline
-        input_frame = ctk.CTkFrame(frame, fg_color="transparent", height=36)
-        input_frame.pack(fill="x", padx=16, pady=(0, 12))
+        # Input area for sending commands to pipeline - pack FIRST at bottom
+        input_frame = ctk.CTkFrame(frame, fg_color="transparent", height=50)
+        input_frame.pack(side="bottom", fill="x", padx=16, pady=(0, 12))
+        # Prevent shrinking when window resizes
+        input_frame.pack_propagate(False)
 
         self.input_entry = ctk.CTkEntry(
             input_frame,
@@ -379,6 +354,17 @@ class PipelineGUI(ctk.CTk):
             font=ctk.CTkFont(size=12),
             command=self._send_input,
         ).pack(side="right")
+
+        # Log textbox - pack AFTER input so it expands in remaining space
+        self.log_text = ctk.CTkTextbox(
+            frame,
+            fg_color=COLORS["bg_console"],
+            text_color=COLORS["accent_green"],
+            font=ctk.CTkFont(family="Consolas", size=12),
+            corner_radius=8,
+        )
+        self.log_text.pack(fill="both", expand=True, padx=16, pady=(8, 8))
+        self.log_text.configure(state="disabled")
 
     # ==================== Actions ====================
     def _browse_path(self):
@@ -501,10 +487,12 @@ class PipelineGUI(ctk.CTk):
                 if result.security_severity == "none"
                 else "Low/Medium severity"
             )
-            self.stats_cards["security"].update_stats(
-                "0" if result.security_severity == "none" else result.security_severity,
-                label,
+            severity = (
+                "0"
+                if result.security_severity == "none"
+                else result.security_severity
             )
+            self.stats_cards["security"].update_stats(severity, label)
 
         # Update graph only when coverage changes
         if should_update_graph:
@@ -513,7 +501,8 @@ class PipelineGUI(ctk.CTk):
                 coverage = float(result.coverage)
             except (ValueError, TypeError):
                 coverage = 0.0
-            elapsed = time.time() - getattr(self, "_pipeline_start_time", time.time())
+            start_time = getattr(self, "_pipeline_start_time", time.time())
+            elapsed = time.time() - start_time
             self.graph.add_point(self._graph_iteration, coverage, elapsed)
 
     def _on_complete(self):
@@ -531,34 +520,38 @@ class PipelineGUI(ctk.CTk):
         self._log(f"\n{'=' * 60}\nPipeline execution finished.\n")
 
         # Auto-load prompts file if available
-        if self.latest_prompts_file:
-            from pathlib import Path
-
-            if Path(self.latest_prompts_file).exists():
-                self._log(f"\n📂 Loading prompts: {self.latest_prompts_file}\n")
-                self.prompts_frame.load_file(self.latest_prompts_file)
-                self.prompts_frame.file_entry.delete(0, "end")
-                self.prompts_frame.file_entry.insert(0, self.latest_prompts_file)
-            self.latest_prompts_file = None  # Reset for next run
+        self._auto_load_file(
+            self.latest_prompts_file, self.prompts_frame, "📂 prompts"
+        )
+        self.latest_prompts_file = None
 
         # Auto-load report file if available
-        if self.latest_report_file:
-            if Path(self.latest_report_file).exists():
-                self._log(f"\n📊 Loading report: {self.latest_report_file}\n")
-                self.report_frame.load_file(self.latest_report_file)
-                self.report_frame.file_entry.delete(0, "end")
-                self.report_frame.file_entry.insert(0, self.latest_report_file)
-            self.latest_report_file = None  # Reset for next run
+        self._auto_load_file(
+            self.latest_report_file, self.report_frame, "📊 report"
+        )
+        self.latest_report_file = None
 
-        # Auto-load coverage file if available
-        if self.latest_coverage_file:
-            if Path(self.latest_coverage_file).exists():
-                self._log(f"\n📊 Loading coverage: {self.latest_coverage_file}\n")
-                self.coverage_frame.load_file(self.latest_coverage_file)
-                self.coverage_frame.file_entry.delete(0, "end")
-                self.coverage_frame.file_entry.insert(0, self.latest_coverage_file)
-                self._show_tab("coverage")  # Switch to coverage tab
-            self.latest_coverage_file = None  # Reset for next run
+        # Auto-load coverage file if available (and switch to coverage tab)
+        self._auto_load_file(
+            self.latest_coverage_file,
+            self.coverage_frame,
+            "📊 coverage",
+            switch_tab="coverage"
+        )
+        self.latest_coverage_file = None
+
+    def _auto_load_file(
+        self, file_path, viewer, label: str, switch_tab: str = None
+    ):
+        """Auto-load a file into a viewer after pipeline completion."""
+        if not file_path or not Path(file_path).exists():
+            return
+        self._log(f"\n{label}: Loading {file_path}\n")
+        viewer.load_file(file_path)
+        viewer.file_entry.delete(0, "end")
+        viewer.file_entry.insert(0, file_path)
+        if switch_tab:
+            self._show_tab(switch_tab)
 
     # ==================== Helpers ====================
     def _reset_ui(self):

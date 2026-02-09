@@ -5,6 +5,7 @@ from pathlib import Path
 from tkinter import filedialog
 import customtkinter as ctk
 from ..theme import COLORS
+from .base_viewer import ViewerToolbarMixin
 from .prompt_card import PromptCard
 
 AGENT_TYPES = [
@@ -16,7 +17,7 @@ AGENT_TYPES = [
 ]
 
 
-class ConversationViewer(ctk.CTkFrame):
+class ConversationViewer(ViewerToolbarMixin, ctk.CTkFrame):
     """Viewer widget with file loader, filter, and scrollable prompt cards."""
 
     def __init__(self, parent, **kwargs):
@@ -26,40 +27,15 @@ class ConversationViewer(ctk.CTkFrame):
         self._build_scroll_area()
 
     def _build_toolbar(self):
-        toolbar = ctk.CTkFrame(
-            self, fg_color=COLORS["bg_card"], corner_radius=12, height=60
-        )
-        toolbar.pack(fill="x", pady=(0, 16))
-        toolbar.pack_propagate(False)
-
-        inner = ctk.CTkFrame(toolbar, fg_color="transparent")
-        inner.pack(fill="x", padx=16, pady=12)
-
-        # File loader
-        ctk.CTkLabel(
-            inner,
-            text="📁 Load:",
-            font=ctk.CTkFont(size=17),
-            text_color=COLORS["text_secondary"],
-        ).pack(side="left")
-        self.file_entry = ctk.CTkEntry(
-            inner,
+        # Use mixin for common toolbar components
+        inner = super()._build_toolbar(
+            label_text="📁 Load:",
             placeholder_text="Select prompts JSON...",
-            width=300,
-            height=36,
-            fg_color=COLORS["input_bg"],
-            border_color=COLORS["border"],
+            browse_callback=self._browse,
+            status_text="No prompts",
         )
-        self.file_entry.pack(side="left", padx=8)
-        ctk.CTkButton(
-            inner,
-            text="Browse",
-            width=70,
-            height=36,
-            fg_color=COLORS["button_primary"],
-            hover_color=COLORS["button_hover"],
-            command=self._browse,
-        ).pack(side="left", padx=(0, 16))
+        # Override file entry width for this viewer
+        self.file_entry.configure(width=300)
 
         # Filter
         ctk.CTkLabel(
@@ -99,14 +75,6 @@ class ConversationViewer(ctk.CTkFrame):
                 font=ctk.CTkFont(size=14),
                 command=cmd,
             ).pack(side="left", padx=2)
-
-        self.stats = ctk.CTkLabel(
-            inner,
-            text="No prompts",
-            font=ctk.CTkFont(size=17),
-            text_color=COLORS["text_muted"],
-        )
-        self.stats.pack(side="right")
 
     def _build_scroll_area(self):
         self.scroll = ctk.CTkScrollableFrame(
@@ -181,7 +149,7 @@ class ConversationViewer(ctk.CTkFrame):
             card.pack(fill="x", padx=4, pady=(0, 10))
             self.prompt_cards.append(card)
 
-        self.stats.configure(
+        self.status.configure(
             text=f"{len(filtered)}/{len(self.prompts_data)} prompts"
             + (f" ({agent})" if "All" not in self.current_filter else "")
         )
@@ -196,14 +164,14 @@ class ConversationViewer(ctk.CTkFrame):
 
     def _update_stats(self, info: str = None):
         text = f"Total: {len(self.prompts_data)}"
-        self.stats.configure(text=f"{info} | {text}" if info else text)
+        self.status.configure(text=f"{info} | {text}" if info else text)
 
     def _error(self, msg: str):
         self.prompts_data = []
         self._render()
         self.empty.configure(text=f"❌ {msg}")
         self.empty.pack(expand=True, pady=100)
-        self.stats.configure(text="Error")
+        self.status.configure(text="Error")
 
     def reset(self):
         self.prompts_data = []
@@ -215,7 +183,7 @@ class ConversationViewer(ctk.CTkFrame):
         self.prompt_cards.clear()
         self.empty.configure(text="📂 No prompts loaded.\nClick 'Browse' to load.")
         self.empty.pack(expand=True, pady=100)
-        self.stats.configure(text="No prompts")
+        self.status.configure(text="No prompts")
 
     def _expand_all(self):
         for c in self.prompt_cards:

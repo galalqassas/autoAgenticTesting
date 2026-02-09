@@ -50,8 +50,8 @@ class BaseAgent:
                 "system_prompt_len": len(system_prompt),
                 "user_prompt_len": len(user_prompt),
                 "model": self.llm_client.current_model,
-                "is_mock": is_mock,
             },
+            risk_level="medium" if not is_mock else "low",
         )
 
         # Record the prompt after the call

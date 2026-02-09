@@ -5,6 +5,7 @@ from pathlib import Path
 from tkinter import filedialog
 import customtkinter as ctk
 from ..theme import COLORS
+from .base_viewer import ViewerToolbarMixin
 
 TAGS = {
     "h1": {"font": ("Segoe UI", 28, "bold"), "foreground": "#60a5fa", "spacing3": 12},
@@ -33,7 +34,7 @@ TAGS = {
 }
 
 
-class ReportViewer(ctk.CTkFrame):
+class ReportViewer(ViewerToolbarMixin, ctk.CTkFrame):
     """Markdown report viewer with styled headers, tables, and inline formatting."""
 
     def __init__(self, parent, **kwargs):
@@ -42,46 +43,13 @@ class ReportViewer(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        # Toolbar
-        bar = ctk.CTkFrame(
-            self, fg_color=COLORS["bg_card"], corner_radius=12, height=60
-        )
-        bar.pack(fill="x", pady=(0, 16))
-        bar.pack_propagate(False)
-        inner = ctk.CTkFrame(bar, fg_color="transparent")
-        inner.pack(fill="x", padx=16, pady=12)
-
-        ctk.CTkLabel(
-            inner,
-            text="📄 Report:",
-            font=ctk.CTkFont(size=17),
-            text_color=COLORS["text_secondary"],
-        ).pack(side="left")
-        self.file_entry = ctk.CTkEntry(
-            inner,
+        # Use mixin for common toolbar components
+        super()._build_toolbar(
+            label_text="📄 Report:",
             placeholder_text="Select .md file...",
-            width=350,
-            height=36,
-            fg_color=COLORS["input_bg"],
-            border_color=COLORS["border"],
+            browse_callback=self._browse,
+            status_text="No report",
         )
-        self.file_entry.pack(side="left", padx=8)
-        ctk.CTkButton(
-            inner,
-            text="Browse",
-            width=70,
-            height=36,
-            fg_color=COLORS["button_primary"],
-            hover_color=COLORS["button_hover"],
-            command=self._browse,
-        ).pack(side="left", padx=(0, 16))
-        self.status = ctk.CTkLabel(
-            inner,
-            text="No report",
-            font=ctk.CTkFont(size=15),
-            text_color=COLORS["text_muted"],
-        )
-        self.status.pack(side="right")
 
         # Content
         self.content = ctk.CTkTextbox(

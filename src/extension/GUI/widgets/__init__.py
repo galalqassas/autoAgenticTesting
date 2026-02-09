@@ -8,6 +8,7 @@ from .prompt_card import PromptCard
 from .conversation_viewer import ConversationViewer
 from .report_viewer import ReportViewer
 from .coverage_viewer import CoverageViewer
+from .base_viewer import ViewerToolbarMixin
 
 __all__ = [
     "PhaseStep",
@@ -18,5 +19,6 @@ __all__ = [
     "ConversationViewer",
     "ReportViewer",
     "CoverageViewer",
+    "ViewerToolbarMixin",
 ]
 

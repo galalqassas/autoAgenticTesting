@@ -101,6 +101,22 @@ class CollapsibleSection(ctk.CTkFrame):
         self.content.configure(state="disabled")
         self.content.pack(fill="both", expand=True, padx=6, pady=(0, 4))
 
+        # Stop scroll events from bubbling to parent scrollable frame
+        self._bind_scroll_events(self.content)
+
+    def _bind_scroll_events(self, widget):
+        """Bind mousewheel events to stop propagation to parent."""
+        def _on_mousewheel(event):
+            # Scroll the textbox (multiply by 3 for faster scrolling)
+            widget.yview_scroll(int(-3 * (event.delta / 120)), "units")
+            return "break"  # Stop propagation
+
+        # Windows
+        widget.bind("<MouseWheel>", _on_mousewheel)
+        # Linux (X11)
+        widget.bind("<Button-4>", lambda e: (widget.yview_scroll(-3, "units"), "break")[-1])
+        widget.bind("<Button-5>", lambda e: (widget.yview_scroll(3, "units"), "break")[-1])
+
     def _toggle(self):
         self.expanded = not self.expanded
         (

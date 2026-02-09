@@ -48,4 +48,5 @@ class TestPackageExports:
             "ConversationViewer",
             "ReportViewer",
             "CoverageViewer",
+            "ViewerToolbarMixin",
         }

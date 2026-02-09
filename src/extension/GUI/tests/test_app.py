@@ -20,6 +20,84 @@ class TestPipelineGUIConfig:
         for name, value, subtext, color in PipelineGUI.STATS:
             assert isinstance(name, str) and color.startswith("#")
 
+    def test_console_input_packed_before_log_textbox(self):
+        """Input frame packed at bottom before log textbox."""
+        from src.extension.GUI.app import PipelineGUI
+        import inspect
+
+        # Verify _build_console packs input_frame with side="bottom"
+        source = inspect.getsource(PipelineGUI._build_console)
+
+        # Find positions of key elements
+        input_pack_pos = source.find('input_frame.pack(side="bottom"')
+        log_pack_pos = source.find('self.log_text.pack(')
+        input_creation_pos = source.find('input_frame = ctk.CTkFrame')
+        log_creation_pos = source.find('self.log_text = ctk.CTkTextbox')
+
+        # Input frame should be created before log_text
+        assert input_creation_pos < log_creation_pos, (
+            "input_frame should be created before log_text"
+        )
+        # Input frame should be packed before log_text
+        assert input_pack_pos < log_pack_pos, (
+            "input_frame should be packed before log_text"
+        )
+        # Input frame should be packed at bottom
+        assert 'input_frame.pack(side="bottom"' in source, (
+            "input_frame should be packed at bottom"
+        )
+        # pack_propagate should be called on input_frame
+        assert "input_frame.pack_propagate(False)" in source, (
+            "input_frame should have pack_propagate(False)"
+        )
+
+    def test_window_geometry_adequate_height(self):
+        """Window should have adequate height for all elements."""
+        from src.extension.GUI.app import PipelineGUI
+        import inspect
+
+        source = inspect.getsource(PipelineGUI._setup_window)
+        # Extract geometry values
+        import re
+        match = re.search(r'geometry\("(\d+)x(\d+)"\)', source)
+        assert match is not None, "geometry should be set in _setup_window"
+
+        width, height = int(match.group(1)), int(match.group(2))
+        assert width >= 1000, f"Window width {width} should be >= 1000"
+        assert height >= 800, (
+            f"Window height {height} should be >= 800 to fit input bar"
+        )
+
+    def test_window_minsize_set(self):
+        """Window should have minimum size constraints."""
+        from src.extension.GUI.app import PipelineGUI
+        import inspect
+
+        source = inspect.getsource(PipelineGUI._setup_window)
+        assert "minsize(" in source, "minsize should be set for window"
+
+    def test_tab_config_exists(self):
+        """PipelineGUI should have TAB_CONFIG for reusable tab buttons."""
+        from src.extension.GUI.app import PipelineGUI
+
+        assert hasattr(PipelineGUI, "TAB_CONFIG"), "TAB_CONFIG should exist"
+        assert len(PipelineGUI.TAB_CONFIG) >= 3, "Should have at least 3 tabs"
+
+        for tab_id, label in PipelineGUI.TAB_CONFIG:
+            assert isinstance(tab_id, str), "Tab ID should be string"
+            assert isinstance(label, str), "Tab label should be string"
+
+    def test_input_frame_has_fixed_height(self):
+        """Input frame should have a fixed height to prevent squishing."""
+        from src.extension.GUI.app import PipelineGUI
+        import inspect
+
+        source = inspect.getsource(PipelineGUI._build_console)
+        # Check that input_frame is created with height parameter
+        assert "height=50" in source or "height=36" in source, (
+            "input_frame should have fixed height"
+        )
+
 
 class TestPipelineGUIModules:
     """Tests for module imports."""
@@ -27,7 +105,9 @@ class TestPipelineGUIModules:
     def test_all_modules_import(self):
         """All GUI modules should import correctly."""
         from src.extension.GUI import app, theme, log_parser, pipeline_runner
-        from src.extension.GUI.widgets import PhaseStep, StatsCard, PerformanceGraph
+        from src.extension.GUI.widgets import (
+            PhaseStep, StatsCard, PerformanceGraph
+        )
 
         assert all(
             x is not None
@@ -51,7 +131,9 @@ class TestPipelineGUIMethods:
         """Create mocked PipelineGUI."""
         with patch("customtkinter.CTk.__init__", return_value=None):
             with patch("src.extension.GUI.app.PipelineGUI._setup_window"):
-                with patch("src.extension.GUI.app.PipelineGUI._init_components"):
+                with patch(
+                    "src.extension.GUI.app.PipelineGUI._init_components"
+                ):
                     with patch("src.extension.GUI.app.PipelineGUI._build_ui"):
                         from src.extension.GUI.app import PipelineGUI
 
@@ -85,12 +167,15 @@ class TestPipelineGUIMethods:
     def test_browse_path(self, mock_gui):
         """_browse_path should update entry on folder selection."""
         with patch(
-            "src.extension.GUI.app.filedialog.askdirectory", return_value="/path"
+            "src.extension.GUI.app.filedialog.askdirectory",
+            return_value="/path"
         ):
             mock_gui._browse_path()
             mock_gui.path_entry.insert.assert_called_with(0, "/path")
 
-        with patch("src.extension.GUI.app.filedialog.askdirectory", return_value=""):
+        with patch(
+            "src.extension.GUI.app.filedialog.askdirectory", return_value=""
+        ):
             mock_gui.path_entry.reset_mock()
             mock_gui._browse_path()
             mock_gui.path_entry.delete.assert_not_called()
@@ -102,7 +187,9 @@ class TestPipelineGUIMethods:
             mock_start.assert_called_once()
 
         mock_gui.runner.is_running = True
-        with patch.object(mock_gui, "_log"), patch.object(mock_gui, "_on_complete"):
+        with patch.object(mock_gui, "_log"), patch.object(
+            mock_gui, "_on_complete"
+        ):
             mock_gui._toggle_pipeline()
             mock_gui.runner.stop.assert_called_once()
 
