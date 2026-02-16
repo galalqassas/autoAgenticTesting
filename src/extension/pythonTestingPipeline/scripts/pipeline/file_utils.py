@@ -1,6 +1,5 @@
 """File utility functions for the Python Testing Pipeline."""
 
-import ast
 import os
 from pathlib import Path
 from typing import List

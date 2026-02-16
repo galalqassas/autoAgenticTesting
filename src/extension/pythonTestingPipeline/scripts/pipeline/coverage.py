@@ -1,11 +1,11 @@
 """Coverage analysis module for the Python Testing Pipeline."""
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Set
 
-from pipeline.code_utils import extract_code_definitions, CodeDefinition
+from pipeline.code_utils import extract_code_definitions
 
 __all__ = [
     "FileCoverageReport",
