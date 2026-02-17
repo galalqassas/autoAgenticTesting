@@ -1,7 +1,7 @@
 """Data models for Python Testing Pipeline."""
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 __all__ = [
     "TestScenario",
@@ -9,6 +9,8 @@ __all__ = [
     "ExecutionSummary",
     "SecurityIssue",
     "TestEvaluationOutput",
+    "MutantInfo",
+    "MutationCoverageReport",
 ]
 
 
@@ -37,6 +39,31 @@ class ExecutionSummary:
 
 
 @dataclass
+class MutantInfo:
+    """Information about a single mutant."""
+
+    mutant_id: str
+    status: str  # 'killed', 'survived', 'timeout', 'suspicious'
+    file_path: str
+    line_number: int
+    original_code: str
+    mutated_code: str
+
+
+@dataclass
+class MutationCoverageReport:
+    """Mutation testing results."""
+
+    mutation_score: float  # percentage of mutants killed
+    total_mutants: int
+    killed: int
+    survived: int
+    timeout: int
+    suspicious: int
+    survived_mutants: List[MutantInfo] = field(default_factory=list)
+
+
+@dataclass
 class SecurityIssue:
     """Represents a security issue found in the code."""
 
@@ -55,3 +82,5 @@ class TestEvaluationOutput:
     actionable_recommendations: List[str]
     security_issues: List[SecurityIssue] = field(default_factory=list)
     has_severe_security_issues: bool = False
+    mutation_score: float = 0.0
+    mutation_report: Optional[MutationCoverageReport] = None

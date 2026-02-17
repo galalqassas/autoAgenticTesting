@@ -417,6 +417,7 @@ Determine intent. Return JSON:
             # Step 5: Run tests with coverage and improvement loop
             if should_run_tests:
                 target_coverage = 90.0
+                target_mutation_score = 80.0
                 max_iterations = 15  # Safety limit to prevent infinite loops
                 current_test_file = test_file
                 current_test_code = test_code
@@ -427,14 +428,30 @@ Determine intent. Return JSON:
                 best_test_code = None  # Will store snapshot of best test code
                 best_severe_count = float("inf")
                 consecutive_no_progress = 0
+                previous_coverage = 0.0  # For mutation testing delta trigger
 
                 while iteration < max_iterations:
                     iteration += 1
                     iteration_start = time_module.time()
                     print(f"\n--- Iteration {iteration} ---")
 
-                    # Run tests with coverage
-                    test_results = run_tests(current_test_file, codebase_path)
+                    # Determine if mutation testing should run this iteration
+                    from pipeline.mutation_testing import should_enable_mutation_testing
+
+                    run_mutation = should_enable_mutation_testing(
+                        current_coverage=previous_coverage,
+                        previous_coverage=best_coverage
+                        if iteration > 1
+                        else 0.0,
+                        iteration=iteration,
+                    )
+
+                    # Run tests with coverage (and mutation if enabled)
+                    test_results = run_tests(
+                        current_test_file,
+                        codebase_path,
+                        run_mutation_tests=run_mutation,
+                    )
                     results["test_output"] = test_results["output"]
                     results["exit_code"] = test_results["exit_code"]
 
@@ -447,16 +464,27 @@ Determine intent. Return JSON:
                     current_coverage = evaluation.code_coverage_percentage
                     has_severe_security = evaluation.has_severe_security_issues
                     security_issues = evaluation.security_issues
+                    mutation_score = evaluation.mutation_score
 
-                    # Check completion criteria: >= 90% coverage AND no severe issues
+                    # Check completion criteria: coverage >= 90% AND no severe security issues
+                    # AND mutation score >= 80% (only enforced when mutation testing ran)
                     coverage_met = current_coverage >= target_coverage
                     security_met = not has_severe_security
+                    mutation_met = (
+                        mutation_score >= target_mutation_score
+                        or not run_mutation
+                    )
 
-                    if coverage_met and security_met:
-                        print("\n✅ All targets met!")
+                    if coverage_met and security_met and mutation_met:
+                        print("\nAll targets met!")
                         print(
-                            f"   Coverage: {current_coverage:.1f}% (≥{target_coverage}%)"
+                            f"   Coverage: {current_coverage:.1f}% (>={target_coverage}%)"
                         )
+                        if run_mutation:
+                            print(
+                                f"   Mutation Score: {mutation_score:.1f}% "
+                                f"(>={target_mutation_score}%)"
+                            )
                         print("   Severe security issues: None")
                         if security_issues:
                             low_med = [
@@ -466,11 +494,11 @@ Determine intent. Return JSON:
                             ]
                             if low_med:
                                 print(
-                                    f"   ℹ️  Minor security issues (low/medium): {len(low_med)}"
+                                    f"   Minor security issues (low/medium): {len(low_med)}"
                                 )
                         iteration_time = time_module.time() - iteration_start
                         iteration_times.append(iteration_time)
-                        print(f"   ⏱️  Iteration time: {iteration_time:.1f}s")
+                        print(f"   Iteration time: {iteration_time:.1f}s")
                         break
 
                     # Check for progress
@@ -490,6 +518,9 @@ Determine intent. Return JSON:
                     if current_severe_count < best_severe_count:
                         best_severe_count = current_severe_count
                         progress_made = True
+
+                    # Update previous coverage for delta calculation
+                    previous_coverage = current_coverage
 
                     if progress_made:
                         consecutive_no_progress = 0

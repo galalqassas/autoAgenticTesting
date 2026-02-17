@@ -283,9 +283,24 @@ def parse_coverage_json(coverage_json_path: Path, source_root: Path) -> dict:
     return {"percentage": 0.0, "uncovered_areas_text": "", "detailed_reports": {}}
 
 
-def run_tests(test_file: Path, codebase_path: Path) -> dict:
-    """Runs the generated PyTest suite with coverage measurement."""
-    print("\n🧪 Running tests with coverage...")
+def run_tests(
+    test_file: Path,
+    codebase_path: Path,
+    run_mutation_tests: bool = False,
+) -> dict:
+    """Runs the generated PyTest suite with coverage measurement.
+
+    Args:
+        test_file: Path to the pytest test file.
+        codebase_path: Root path of the source code being tested.
+        run_mutation_tests: If True, run mutation testing after the
+            pytest suite completes.
+
+    Returns:
+        Dict containing test results, coverage data, and optionally
+        mutation testing results.
+    """
+    print("\nRunning tests with coverage...")
 
     # Get source directory to measure coverage
     source_dir = str(codebase_path)
@@ -337,7 +352,6 @@ omit =
             cwd=test_file.parent.parent,
         )
         output = result.stdout + "\n" + result.stderr
-        # print(output)  # Suppressed verbose output
 
         # Parse test results from output
         test_results = parse_pytest_output(output)
@@ -345,6 +359,29 @@ omit =
         # Parse coverage from JSON report
         coverage_json_path = test_file.parent.parent / "coverage.json"
         coverage_data = parse_coverage_json(coverage_json_path, codebase_path)
+
+        # Run mutation testing if enabled
+        mutation_score = 0.0
+        mutation_report = None
+        mutation_feedback = ""
+
+        if run_mutation_tests:
+            try:
+                from pipeline.mutation_testing import (
+                    run_mutation_testing,
+                    format_mutation_feedback,
+                )
+
+                mutation_report = run_mutation_testing(
+                    codebase_path=codebase_path,
+                    test_file=test_file,
+                    min_file_coverage=95.0,
+                    timeout=600,
+                )
+                mutation_score = mutation_report.mutation_score
+                mutation_feedback = format_mutation_feedback(mutation_report)
+            except Exception as exc:
+                print(f"   Mutation testing failed: {exc}")
 
         return {
             "output": output,
@@ -355,6 +392,9 @@ omit =
             "coverage_percentage": coverage_data["percentage"],
             "uncovered_areas_text": coverage_data["uncovered_areas_text"],
             "coverage_details": coverage_data["detailed_reports"],
+            "mutation_score": mutation_score,
+            "mutation_report": mutation_report,
+            "mutation_feedback": mutation_feedback,
         }
     except subprocess.TimeoutExpired:
         return {
@@ -366,6 +406,9 @@ omit =
             "coverage_percentage": 0.0,
             "uncovered_areas_text": "",
             "coverage_details": {},
+            "mutation_score": 0.0,
+            "mutation_report": None,
+            "mutation_feedback": "",
         }
     except Exception as e:
         return {
@@ -377,4 +420,7 @@ omit =
             "coverage_percentage": 0.0,
             "uncovered_areas_text": "",
             "coverage_details": {},
+            "mutation_score": 0.0,
+            "mutation_report": None,
+            "mutation_feedback": "",
         }

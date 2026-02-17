@@ -66,6 +66,9 @@ def parse_prompts_file(prompts_file: Path):
                     "timestamp": timestamp_str,
                     "execution_time_seconds": execution_time,
                     "code_coverage_percentage": eval_data.get("code_coverage_percentage", 0.0),
+                    "mutation_score": eval_data.get("mutation_score", 0.0),
+                    "mutants_killed": eval_data.get("mutation_report", {}).get("killed", 0) if eval_data.get("mutation_report") else 0,
+                    "mutants_survived": eval_data.get("mutation_report", {}).get("survived", 0) if eval_data.get("mutation_report") else 0,
                     "security_issues_count": len(eval_data.get("security_issues", [])),
                     "tests_total": eval_data.get("execution_summary", {}).get("total_tests", 0),
                     "tests_passed": eval_data.get("execution_summary", {}).get("passed", 0),
@@ -106,6 +109,7 @@ def parse_prompts_file(prompts_file: Path):
         "summary": {
             "total_iterations": iteration_count,
             "final_coverage": pipeline_metrics[-1]['code_coverage_percentage'] if pipeline_metrics else 0.0,
+            "final_mutation_score": pipeline_metrics[-1].get('mutation_score', 0.0) if pipeline_metrics else 0.0,
             "final_security_issues": len(security_issues_all)
         }
     }

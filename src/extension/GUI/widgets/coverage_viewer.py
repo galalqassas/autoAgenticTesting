@@ -217,6 +217,16 @@ class CoverageViewer(ViewerToolbarMixin, ctk.CTkFrame):
             status_text="No data",
         )
 
+        # Summary header
+        self.summary_frame = ctk.CTkFrame(self, fg_color=COLORS["bg_card"], corner_radius=12)
+        self.summary_frame.pack(fill="x", pady=(0, 16))
+        self.summary_label = ctk.CTkLabel(
+            self.summary_frame,
+            text="Overall Coverage: --%",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=COLORS["accent_green"],
+        )
+        self.summary_label.pack(pady=16)
 
         # Scrollable file list
         self.scroll_frame = ctk.CTkScrollableFrame(self, fg_color=COLORS["bg_dark"], corner_radius=12)
@@ -256,6 +266,16 @@ class CoverageViewer(ViewerToolbarMixin, ctk.CTkFrame):
             card.destroy()
         self.file_cards.clear()
 
+        # Calculate overall
+        total_lines = sum(f.get("total_lines", 0) for f in self.data.values())
+        covered_lines = sum(f.get("covered_lines", 0) for f in self.data.values())
+        overall_pct = (covered_lines / total_lines * 100) if total_lines > 0 else 0.0
+
+        color = _get_color_for_pct(overall_pct)
+        self.summary_label.configure(
+            text=f"Overall Coverage: {overall_pct:.1f}% ({covered_lines}/{total_lines} lines)",
+            text_color=color
+        )
 
         # Sort by coverage ascending (worst first)
         for file_path, file_data in sorted(self.data.items(), key=lambda x: x[1].get("coverage_percentage", 0)):
@@ -275,6 +295,7 @@ class CoverageViewer(ViewerToolbarMixin, ctk.CTkFrame):
             self.file_cards.append(card)
 
     def _open_in_editor(self, file_path: str, line: int):
+        """Open file in VS Code at the specified line."""
         try:
             subprocess.Popen(["code", "-g", f"{file_path}:{line}"], shell=True)
         except Exception as e:
@@ -291,6 +312,7 @@ class CoverageViewer(ViewerToolbarMixin, ctk.CTkFrame):
             card.destroy()
         self.file_cards.clear()
         self.file_entry.delete(0, "end")
+        self.summary_label.configure(text="Overall Coverage: --%")
         self.empty.configure(text="📊 No coverage data loaded.\nRun the pipeline or click 'Browse'.")
         self.empty.place(relx=0.5, rely=0.6, anchor="center")
         self.status.configure(text="No data")

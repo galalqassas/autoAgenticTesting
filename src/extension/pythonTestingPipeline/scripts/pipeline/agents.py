@@ -600,20 +600,34 @@ class EvaluationAgent(BaseAgent):
         self, test_results: dict, scenarios: TestScenariosOutput, codebase_path: Path
     ) -> TestEvaluationOutput:
         """Evaluates test results, coverage, and security."""
-        print("\n📊 Agent 3: Evaluating test results and security...")
+        print("\nAgent 3: Evaluating test results and security...")
 
         # Use actual measured values
         actual_coverage = test_results.get("coverage_percentage", 0.0)
+        actual_mutation_score = test_results.get("mutation_score", 0.0)
+        mutation_feedback = test_results.get("mutation_feedback", "")
         total_tests = test_results.get("total_tests", 0)
         passed = test_results.get("passed", 0)
         failed = test_results.get("failed", 0)
 
         print(f"   Actual coverage measured: {actual_coverage:.1f}%")
+        if actual_mutation_score > 0:
+            print(f"   Mutation score: {actual_mutation_score:.1f}%")
 
         # Gather source code for security analysis - limit size to prevent 413
         python_files = gather_python_files(codebase_path)
         code_chunks = read_file_contents_chunked(python_files)
         source_code = "\n\n".join(code_chunks[:10])[:15000]  # Max 15000 chars
+
+        # Build mutation section for the prompt
+        mutation_section = ""
+        if mutation_feedback:
+            mutation_section = f"""\n\nMutation Coverage:
+{mutation_feedback}
+
+Mutation coverage shows test effectiveness. Survived mutants indicate
+gaps where tests pass even when bugs are introduced.
+Target: Aim for >80% mutation score for robust test suites."""
 
         scenarios_json = json.dumps(asdict(scenarios), indent=2)[
             :2000
@@ -627,6 +641,7 @@ Test Results:
 - Passed: {passed}
 - Failed: {failed}
 - Code Coverage: {actual_coverage:.1f}%
+- Mutation Score: {actual_mutation_score:.1f}%{mutation_section}
 
 PyTest Output:
 {test_results.get("output", "")[:2000]}
@@ -686,12 +701,12 @@ Respond with JSON containing execution_summary, code_coverage_percentage, securi
                 )
 
             if security_issues:
-                print(f"   🔒 Security issues found: {len(security_issues)}")
+                print(f"   Security issues found: {len(security_issues)}")
                 severe_count = sum(
                     1 for si in security_issues if si.severity in ("critical", "high")
                 )
                 if severe_count > 0:
-                    print(f"   ⚠️  Severe issues (critical/high): {severe_count}")
+                    print(f"   Severe issues (critical/high): {severe_count}")
 
             # Override with actual measured values
             return TestEvaluationOutput(
@@ -702,6 +717,8 @@ Respond with JSON containing execution_summary, code_coverage_percentage, securi
                 actionable_recommendations=data.get("actionable_recommendations", []),
                 security_issues=security_issues,
                 has_severe_security_issues=has_severe,
+                mutation_score=actual_mutation_score,
+                mutation_report=test_results.get("mutation_report"),
             )
         except (json.JSONDecodeError, KeyError, AttributeError) as e:
             # Return actual values even if LLM parsing fails
@@ -713,4 +730,6 @@ Respond with JSON containing execution_summary, code_coverage_percentage, securi
                 actionable_recommendations=[f"Evaluation parsing failed: {e}"],
                 security_issues=[],
                 has_severe_security_issues=False,
+                mutation_score=actual_mutation_score,
+                mutation_report=test_results.get("mutation_report"),
             )

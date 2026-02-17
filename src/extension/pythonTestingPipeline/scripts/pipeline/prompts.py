@@ -121,6 +121,7 @@ Return a single JSON object with this exact structure:
     "failed": 2
   },
   "code_coverage_percentage": 85.5,
+  "mutation_score": 75.0,
   "actionable_recommendations": [
     "Add tests for 'process_data' with empty inputs.",
     "Mock external API calls in 'test_api_client'."
@@ -139,9 +140,10 @@ Return a single JSON object with this exact structure:
 
 **Analysis Guidelines:**
 - Base coverage percentage on pytest-cov output
+- Base mutation score on mutation testing output (0.0 if not available)
 - Flag security issues: hardcoded secrets, SQL injection risks, XSS vulnerabilities, insecure dependencies, path traversal, weak crypto
 - Severity: critical (immediate exploit risk), high (exploitable with effort), medium (potential risk), low (best practice)
-- Recommendations should target uncovered code, failed tests, and severe security issues
+- Recommendations should target uncovered code, failed tests, survived mutants, and severe security issues
 - Set `has_severe_security_issues` to `true` if any critical or high severity issues exist
 
 **Rules:**
