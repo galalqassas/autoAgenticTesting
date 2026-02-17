@@ -1,6 +1,7 @@
 """Base viewer mixin providing common toolbar UI pattern for viewer widgets."""
 
 import customtkinter as ctk
+
 from ..theme import COLORS
 
 

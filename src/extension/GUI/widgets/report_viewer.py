@@ -3,7 +3,9 @@
 import re
 from pathlib import Path
 from tkinter import filedialog
+
 import customtkinter as ctk
+
 from ..theme import COLORS
 from .base_viewer import ViewerToolbarMixin
 

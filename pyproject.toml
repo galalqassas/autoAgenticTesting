@@ -1,0 +1,7 @@
+[tool.ruff]
+line-length = 200
+# Ignore E402 (Module level import not at top of file)
+ignore = ["E402"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

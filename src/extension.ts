@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
 			location: vscode.ProgressLocation.Notification,
 			title: "Generating Tests...",
 			cancellable: true
-		}, async (progress, token) => {
+		}, async (progress, _token) => {
 			try {
 				progress.report({ message: 'Analyzing codebase...' });
 				

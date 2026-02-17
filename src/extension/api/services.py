@@ -3,60 +3,62 @@
 import ast
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Generator
-from dataclasses import asdict
 
 from .schemas import (
-    InfoResponse,
-    PipelineRequest,
-    PipelineResponse,
+    CodebaseAnalyzeRequest,
+    CodebaseAnalyzeResponse,
+    CoverageRequest,
+    CoverageResponse,
+    EvaluateRequest,
+    EvaluateResponse,
+    EvaluationOutput,
+    ExecutionSummary,
+    ExtractDepsRequest,
+    ExtractDepsResponse,
+    FileCoverage,
+    FileInfo,
+    FixSyntaxRequest,
     IdentifyRequest,
     IdentifyResponse,
-    RefineRequest,
     ImplementRequest,
     ImplementResponse,
     ImproveRequest,
     ImproveResponse,
-    FixSyntaxRequest,
-    EvaluateRequest,
-    EvaluateResponse,
-    TestRunRequest,
-    TestRunResponse,
-    ParseOutputRequest,
-    ParseOutputResponse,
-    ExtractDepsRequest,
-    ExtractDepsResponse,
+    InfoResponse,
     InstallDepsRequest,
     InstallDepsResponse,
-    ParseLogRequest,
-    ParseLogResponse,
-    ModelsResponse,
-    TestScenario,
-    ScenariosOutput,
-    SecurityIssue,
-    ExecutionSummary,
-    EvaluationOutput,
-    SafetyValidateRequest,
-    SafetyValidateResponse,
-    CodebaseAnalyzeRequest,
-    CodebaseAnalyzeResponse,
-    FileInfo,
+    InterpretInputRequest,
+    InterpretInputResponse,
     ListFilesRequest,
     ListFilesResponse,
+    ModelsResponse,
+    ParseLogRequest,
+    ParseLogResponse,
+    ParseOutputRequest,
+    ParseOutputResponse,
+    PipelineRequest,
+    PipelineResponse,
     PipelineStatus,
     PipelineStatusResponse,
-    CoverageRequest,
-    CoverageResponse,
-    FileCoverage,
+    PromptEntry,
     PromptsHistoryResponse,
     PromptsRunInfo,
     PromptsRunResponse,
-    PromptEntry,
-    InterpretInputRequest,
-    InterpretInputResponse,
+    RefineRequest,
+    SafetyValidateRequest,
+    SafetyValidateResponse,
+    ScenariosOutput,
+    SecurityIssue,
+    TestRunRequest,
+    TestRunResponse,
+    TestScenario,
     ValidateSyntaxRequest,
     ValidateSyntaxResponse,
+)
+from .schemas import (
     SyntaxError as SyntaxErrorSchema,
 )
 
@@ -83,9 +85,9 @@ def _pipeline():
 
 def _agents():
     from pipeline.agents import (
+        EvaluationAgent,
         IdentificationAgent,
         ImplementationAgent,
-        EvaluationAgent,
     )
 
     return _get(
@@ -106,7 +108,8 @@ def _parser():
 
 
 def _to_internal(scenarios):
-    from pipeline.models import TestScenario as TS, TestScenariosOutput as TSO
+    from pipeline.models import TestScenario as TS
+    from pipeline.models import TestScenariosOutput as TSO
 
     return TSO(
         test_scenarios=[

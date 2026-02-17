@@ -1,7 +1,8 @@
 """Unit tests for PipelineGUI application."""
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 
 
 class TestPipelineGUIConfig:
@@ -22,8 +23,9 @@ class TestPipelineGUIConfig:
 
     def test_console_input_packed_before_log_textbox(self):
         """Input frame packed at bottom before log textbox."""
-        from src.extension.GUI.app import PipelineGUI
         import inspect
+
+        from src.extension.GUI.app import PipelineGUI
 
         # Verify _build_console packs input_frame with side="bottom"
         source = inspect.getsource(PipelineGUI._build_console)
@@ -53,8 +55,9 @@ class TestPipelineGUIConfig:
 
     def test_window_geometry_adequate_height(self):
         """Window should have adequate height for all elements."""
-        from src.extension.GUI.app import PipelineGUI
         import inspect
+
+        from src.extension.GUI.app import PipelineGUI
 
         source = inspect.getsource(PipelineGUI._setup_window)
         # Extract geometry values
@@ -70,8 +73,9 @@ class TestPipelineGUIConfig:
 
     def test_window_minsize_set(self):
         """Window should have minimum size constraints."""
-        from src.extension.GUI.app import PipelineGUI
         import inspect
+
+        from src.extension.GUI.app import PipelineGUI
 
         source = inspect.getsource(PipelineGUI._setup_window)
         assert "minsize(" in source, "minsize should be set for window"
@@ -89,8 +93,9 @@ class TestPipelineGUIConfig:
 
     def test_input_frame_has_fixed_height(self):
         """Input frame should have a fixed height to prevent squishing."""
-        from src.extension.GUI.app import PipelineGUI
         import inspect
+
+        from src.extension.GUI.app import PipelineGUI
 
         source = inspect.getsource(PipelineGUI._build_console)
         # Check that input_frame is created with height parameter
@@ -104,10 +109,8 @@ class TestPipelineGUIModules:
 
     def test_all_modules_import(self):
         """All GUI modules should import correctly."""
-        from src.extension.GUI import app, theme, log_parser, pipeline_runner
-        from src.extension.GUI.widgets import (
-            PhaseStep, StatsCard, PerformanceGraph
-        )
+        from src.extension.GUI import app, log_parser, pipeline_runner, theme
+        from src.extension.GUI.widgets import PerformanceGraph, PhaseStep, StatsCard
 
         assert all(
             x is not None

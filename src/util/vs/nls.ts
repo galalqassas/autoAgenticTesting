@@ -5,9 +5,9 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-// eslint-disable-next-line local/code-import-patterns
+
 import { getNLSLanguage, getNLSMessages } from './nls.messages';
-// eslint-disable-next-line local/code-import-patterns
+
 export { getNLSLanguage, getNLSMessages } from './nls.messages';
 
 declare const document: { location?: { hash?: string } } | undefined;

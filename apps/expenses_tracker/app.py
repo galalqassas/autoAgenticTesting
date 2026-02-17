@@ -2,9 +2,10 @@
 
 import tkinter as tk
 from tkinter import ttk
-from config import COLORS, CATEGORIES, PAYMENT_METHODS, APP_TITLE
+
+from config import APP_TITLE, CATEGORIES, COLORS, PAYMENT_METHODS
 from models import Expense, ExpenseStorage
-from widgets import StyledButton, StyledEntry, ExpenseCard, SummaryPanel
+from widgets import ExpenseCard, StyledButton, StyledEntry, SummaryPanel
 
 
 class ExpenseApp:

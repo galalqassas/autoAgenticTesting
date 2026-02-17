@@ -1,10 +1,11 @@
 from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .routers import branches, cart, products
 from .services.file_service import load_json
-from .routers import products, branches, cart
 
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"

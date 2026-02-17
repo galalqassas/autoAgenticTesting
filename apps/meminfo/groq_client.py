@@ -1,8 +1,9 @@
 """Groq AI client with API key rotation for rate limit handling."""
 
 import os
-from groq import Groq
+
 from dotenv import load_dotenv
+from groq import Groq
 from prompt_templates import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 
 load_dotenv()

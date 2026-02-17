@@ -1,7 +1,7 @@
-import random
-import os
-import time
 import json
+import os
+import random
+import time
 
 LETTERS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 DIFFICULTY = {"easy": 7, "medium": 5, "hard": 3}

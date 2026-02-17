@@ -31,8 +31,9 @@ class TestStatsCard:
 
     def test_class_structure(self):
         """StatsCard should have required methods and inherit from CTkFrame."""
-        from src.extension.GUI.widgets.stats_card import StatsCard
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.stats_card import StatsCard
 
         assert issubclass(StatsCard, ctk.CTkFrame)
         assert callable(getattr(StatsCard, "update_stats"))
@@ -44,8 +45,9 @@ class TestPerformanceGraph:
 
     def test_class_structure(self):
         """PerformanceGraph should inherit from CTkFrame."""
-        from src.extension.GUI.widgets.perf_graph import PerformanceGraph
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.perf_graph import PerformanceGraph
 
         assert issubclass(PerformanceGraph, ctk.CTkFrame)
 
@@ -81,8 +83,9 @@ class TestAgentFlow:
 
     def test_class_structure(self):
         """AgentFlow should inherit from CTkFrame and have required methods."""
-        from src.extension.GUI.widgets.agent_flow import AgentFlow
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.agent_flow import AgentFlow
 
         assert issubclass(AgentFlow, ctk.CTkFrame)
         for method in [
@@ -101,8 +104,9 @@ class TestPromptCard:
 
     def test_class_structure(self):
         """PromptCard should inherit CTkFrame and have require methods."""
-        from src.extension.GUI.widgets.prompt_card import PromptCard
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.prompt_card import PromptCard
 
         assert issubclass(PromptCard, ctk.CTkFrame)
         assert callable(getattr(PromptCard, "expand_all"))
@@ -127,8 +131,9 @@ class TestCollapsibleSection:
 
     def test_class_structure(self):
         """CollapsibleSection should inherit CTkFrame & have methods."""
-        from src.extension.GUI.widgets.prompt_card import CollapsibleSection
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.prompt_card import CollapsibleSection
 
         assert issubclass(CollapsibleSection, ctk.CTkFrame)
         for method in ["expand", "collapse", "_toggle", "_copy"]:
@@ -164,10 +169,9 @@ class TestConversationViewer:
 
     def test_class_structure(self):
         """ConversationViewer should inherit CTkFrame / require methods."""
-        from src.extension.GUI.widgets.conversation_viewer import (
-            ConversationViewer
-        )
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.conversation_viewer import ConversationViewer
 
         assert issubclass(ConversationViewer, ctk.CTkFrame)
         for method in [
@@ -182,19 +186,16 @@ class TestConversationViewer:
 
     def test_inherits_viewer_toolbar_mixin(self):
         """ConversationViewer should inherit from ViewerToolbarMixin."""
-        from src.extension.GUI.widgets.conversation_viewer import (
-            ConversationViewer
-        )
         from src.extension.GUI.widgets.base_viewer import ViewerToolbarMixin
+        from src.extension.GUI.widgets.conversation_viewer import ConversationViewer
 
         assert issubclass(ConversationViewer, ViewerToolbarMixin)
 
     def test_uses_mixin_status_not_stats(self):
         """ConversationViewer should use self.status, not self.stats."""
-        from src.extension.GUI.widgets.conversation_viewer import (
-            ConversationViewer
-        )
         import inspect
+
+        from src.extension.GUI.widgets.conversation_viewer import ConversationViewer
 
         # Check _render method uses self.status, not self.stats
         source = inspect.getsource(ConversationViewer._render)
@@ -216,8 +217,9 @@ class TestReportViewer:
 
     def test_class_structure(self):
         """ReportViewer should inherit CTkFrame and have required methods."""
-        from src.extension.GUI.widgets.report_viewer import ReportViewer
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.report_viewer import ReportViewer
 
         assert issubclass(ReportViewer, ctk.CTkFrame)
         for method in [
@@ -286,8 +288,9 @@ class TestViewerToolbarMixin:
 
     def test_build_toolbar_method_signature(self):
         """_build_toolbar should accept expected parameters."""
-        from src.extension.GUI.widgets.base_viewer import ViewerToolbarMixin
         import inspect
+
+        from src.extension.GUI.widgets.base_viewer import ViewerToolbarMixin
 
         sig = inspect.signature(ViewerToolbarMixin._build_toolbar)
         params = list(sig.parameters.keys())
@@ -298,8 +301,9 @@ class TestViewerToolbarMixin:
 
     def test_mixin_creates_status_attribute(self):
         """_build_toolbar should create self.status label."""
-        from src.extension.GUI.widgets.base_viewer import ViewerToolbarMixin
         import inspect
+
+        from src.extension.GUI.widgets.base_viewer import ViewerToolbarMixin
 
         source = inspect.getsource(ViewerToolbarMixin._build_toolbar)
         assert "self.status" in source
@@ -308,11 +312,9 @@ class TestViewerToolbarMixin:
     def test_viewers_inherit_mixin(self):
         """All viewer classes should inherit from ViewerToolbarMixin."""
         from src.extension.GUI.widgets.base_viewer import ViewerToolbarMixin
-        from src.extension.GUI.widgets.conversation_viewer import (
-            ConversationViewer
-        )
-        from src.extension.GUI.widgets.report_viewer import ReportViewer
+        from src.extension.GUI.widgets.conversation_viewer import ConversationViewer
         from src.extension.GUI.widgets.coverage_viewer import CoverageViewer
+        from src.extension.GUI.widgets.report_viewer import ReportViewer
 
         for viewer_cls in [ConversationViewer, ReportViewer, CoverageViewer]:
             assert issubclass(viewer_cls, ViewerToolbarMixin), (
@@ -326,14 +328,14 @@ class TestWidgetsPackage:
     def test_all_exports(self):
         """Widgets __init__ should export all expected classes."""
         from src.extension.GUI.widgets import (
-            PhaseStep,
-            StatsCard,
-            PerformanceGraph,
             AgentFlow,
-            PromptCard,
             ConversationViewer,
-            ReportViewer,
             CoverageViewer,
+            PerformanceGraph,
+            PhaseStep,
+            PromptCard,
+            ReportViewer,
+            StatsCard,
         )
 
         assert all(
@@ -373,8 +375,9 @@ class TestCoverageViewer:
 
     def test_class_structure(self):
         """CoverageViewer should inherit CTkFrame and have required methods."""
-        from src.extension.GUI.widgets.coverage_viewer import CoverageViewer
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.coverage_viewer import CoverageViewer
 
         assert issubclass(CoverageViewer, ctk.CTkFrame)
         for method in [
@@ -394,8 +397,9 @@ class TestFileCoverageCard:
 
     def test_class_structure(self):
         """FileCoverageCard should inherit CTkFrame & have methods."""
-        from src.extension.GUI.widgets.coverage_viewer import FileCoverageCard
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.coverage_viewer import FileCoverageCard
 
         assert issubclass(FileCoverageCard, ctk.CTkFrame)
         for method in [
@@ -410,8 +414,9 @@ class TestCodeContextViewer:
 
     def test_class_structure(self):
         """CodeContextViewer should inherit CTkFrame & have methods."""
-        from src.extension.GUI.widgets.coverage_viewer import CodeContextViewer
         import customtkinter as ctk
+
+        from src.extension.GUI.widgets.coverage_viewer import CodeContextViewer
 
         assert issubclass(CodeContextViewer, ctk.CTkFrame)
         for method in ["_build_ui", "_load_content"]:
@@ -423,63 +428,49 @@ class TestCoverageHelperFunctions:
 
     def test_get_color_for_pct_green(self):
         """_get_color_for_pct should return green for >=80%."""
-        from src.extension.GUI.widgets.coverage_viewer import (
-            _get_color_for_pct
-        )
         from src.extension.GUI.theme import COLORS
+        from src.extension.GUI.widgets.coverage_viewer import _get_color_for_pct
 
         assert _get_color_for_pct(100) == COLORS["accent_green"]
         assert _get_color_for_pct(80) == COLORS["accent_green"]
 
     def test_get_color_for_pct_yellow(self):
         """_get_color_for_pct should return yellow for 50-79%."""
-        from src.extension.GUI.widgets.coverage_viewer import (
-            _get_color_for_pct
-        )
+        from src.extension.GUI.widgets.coverage_viewer import _get_color_for_pct
 
         assert _get_color_for_pct(79) == "#facc15"
         assert _get_color_for_pct(50) == "#facc15"
 
     def test_get_color_for_pct_red(self):
         """_get_color_for_pct should return red for <50%."""
-        from src.extension.GUI.widgets.coverage_viewer import (
-            _get_color_for_pct
-        )
         from src.extension.GUI.theme import COLORS
+        from src.extension.GUI.widgets.coverage_viewer import _get_color_for_pct
 
         assert _get_color_for_pct(49) == COLORS["accent_red"]
         assert _get_color_for_pct(0) == COLORS["accent_red"]
 
     def test_format_line_ranges_empty(self):
         """_format_line_ranges should return empty string for empty list."""
-        from src.extension.GUI.widgets.coverage_viewer import (
-            _format_line_ranges
-        )
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
 
         assert _format_line_ranges([]) == ""
 
     def test_format_line_ranges_single(self):
         """_format_line_ranges should format single line."""
-        from src.extension.GUI.widgets.coverage_viewer import (
-            _format_line_ranges
-        )
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
 
         assert _format_line_ranges([5]) == "5"
 
     def test_format_line_ranges_consecutive(self):
         """_format_line_ranges should collapse consecutive lines."""
-        from src.extension.GUI.widgets.coverage_viewer import (
-            _format_line_ranges
-        )
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
 
         assert _format_line_ranges([1, 2, 3]) == "1-3"
         assert _format_line_ranges([1, 2, 3, 5, 6, 10]) == "1-3, 5-6, 10"
 
     def test_format_line_ranges_limit(self):
         """_format_line_ranges should respect limit parameter."""
-        from src.extension.GUI.widgets.coverage_viewer import (
-            _format_line_ranges
-        )
+        from src.extension.GUI.widgets.coverage_viewer import _format_line_ranges
 
         result = _format_line_ranges([1, 3, 5, 7, 9, 11, 13], limit=3)
         assert result.endswith("...")

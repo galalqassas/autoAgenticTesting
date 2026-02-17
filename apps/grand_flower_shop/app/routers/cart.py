@@ -1,9 +1,10 @@
+from pathlib import Path
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ..services.cart_service import get_cart
 from ..services.file_service import load_json
-from pathlib import Path
 
 router = APIRouter()
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"

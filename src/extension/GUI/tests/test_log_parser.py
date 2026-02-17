@@ -1,6 +1,7 @@
 """Unit tests for LogParser module."""
 
 import pytest
+
 from src.extension.GUI.log_parser import LogParser, ParseResult
 
 

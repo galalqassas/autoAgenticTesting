@@ -1,6 +1,7 @@
 """File reader module for markdown and PDF extraction."""
-import pdfplumber
 from pathlib import Path
+
+import pdfplumber
 
 
 def read_file(path: str) -> str:
@@ -8,7 +9,7 @@ def read_file(path: str) -> str:
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"File not found: {path}")
-    
+
     ext = p.suffix.lower()
     if ext == ".pdf":
         return _read_pdf(p)

@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 from llm_config import create_llm_client
 from pipeline.prompts import (
@@ -183,12 +183,12 @@ def install_dependencies_with_retry(packages: List[str], cwd: Path) -> Tuple[str
                 llm_client = create_llm_client(use_mock_on_failure=True)
 
                 user_prompt = f"""Dependency installation failed.
-                
+
                 Packages attempted: {missing_packages}
-                
+
                 Error message:
                 {result.stderr}
-                
+
                 Suggest a fix."""
 
                 response, _ = llm_client.call(DEPENDENCY_FIX_SYSTEM_PROMPT, user_prompt)
@@ -255,19 +255,20 @@ def parse_pytest_output(output: str) -> Dict[str, int]:
 def parse_coverage_json(coverage_json_path: Path, source_root: Path) -> dict:
     """
     Parses coverage.json to extract detailed coverage information.
-    
+
     Returns a dict with:
       - percentage: overall coverage percentage
       - uncovered_areas_text: formatted string for LLM
       - detailed_reports: dict of FileCoverageReport (as dicts)
     """
     try:
+        from dataclasses import asdict
+
         from pipeline.coverage import (
             analyze_coverage,
             format_uncovered_areas,
             get_overall_percentage,
         )
-        from dataclasses import asdict
 
         if coverage_json_path.exists():
             reports = analyze_coverage(coverage_json_path, source_root)
@@ -368,8 +369,8 @@ omit =
         if run_mutation_tests:
             try:
                 from pipeline.mutation_testing import (
-                    run_mutation_testing,
                     format_mutation_feedback,
+                    run_mutation_testing,
                 )
 
                 mutation_report = run_mutation_testing(

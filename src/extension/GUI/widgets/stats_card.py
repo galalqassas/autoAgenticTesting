@@ -1,6 +1,7 @@
 """Stats card widget for displaying metrics."""
 
 import customtkinter as ctk
+
 from ..theme import COLORS
 
 

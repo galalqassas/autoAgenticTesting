@@ -3,6 +3,7 @@
 
 import argparse
 from pathlib import Path
+
 from file_reader import read_file
 from groq_client import generate_memorization_guide
 

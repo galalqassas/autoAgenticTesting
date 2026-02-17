@@ -1,8 +1,8 @@
 """Unit tests for main.py entry point."""
 
 
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 
 class TestMain:

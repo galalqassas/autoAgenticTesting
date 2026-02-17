@@ -1,6 +1,7 @@
 """Performance graph widget for displaying coverage and time over iterations."""
 
 import customtkinter as ctk
+
 from ..theme import COLORS
 
 try:

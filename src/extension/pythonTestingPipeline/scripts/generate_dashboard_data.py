@@ -1,8 +1,9 @@
 import json
-import sys
 import re
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
+
 
 def parse_prompts_file(prompts_file: Path):
     with open(prompts_file, 'r', encoding='utf-8') as f:

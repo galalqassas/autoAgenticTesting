@@ -147,7 +147,7 @@ export function mapContributedToolNamesInString(str: string): string {
 }
 
 export function mapContributedToolNamesInSchema(inputSchema: object): object {
-	return cloneAndChange(inputSchema, value => typeof value === 'string' ? mapContributedToolNamesInString(value) : undefined);
+	return cloneAndChange(inputSchema, value => typeof value === 'string' ? mapContributedToolNamesInString(value) : undefined) as object;
 }
 
 /**

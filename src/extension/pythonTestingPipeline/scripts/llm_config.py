@@ -2,8 +2,8 @@
 """LLM client for Groq API with shared rate limiting."""
 
 import os
-import time
 import threading
+import time
 from pathlib import Path
 
 try:
@@ -24,13 +24,13 @@ if _env.exists():
 # Model specs: context, max_output, rpm, tpm
 MODEL_SPECS = {
     "openai/gpt-oss-120b": (131072, 65536, 1000, 250000),
+    "openai/gpt-oss-20b": (131072, 65536, 1000, 250000),
     "moonshotai/kimi-k2-instruct-0905": (262144, 16384, 60, 10000),
     "groq/compound": (131072, 8192, 200, 200000),
-    # "openai/gpt-oss-20b": (131072, 65536, 1000, 250000),
-    # "meta-llama/llama-4-maverick-17b-128e-instruct": (131072, 8192, 1000, 250000),
-    # "meta-llama/llama-4-scout-17b-16e-instruct": (131072, 8192, 1000, 250000),
-    # "moonshotai/kimi-k2-instruct": (131072, 8192, 60, 10000),
-    # "groq/compound-mini": (131072, 8192, 200, 200000),
+    "meta-llama/llama-4-maverick-17b-128e-instruct": (131072, 8192, 1000, 250000),
+    "meta-llama/llama-4-scout-17b-16e-instruct": (131072, 8192, 1000, 250000),
+    "moonshotai/kimi-k2-instruct": (131072, 8192, 60, 10000),
+    "groq/compound-mini": (131072, 8192, 200, 200000),
 }
 MODELS = list(MODEL_SPECS.keys())
 

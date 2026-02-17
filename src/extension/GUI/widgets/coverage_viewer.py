@@ -7,6 +7,7 @@ from tkinter import filedialog
 from typing import Dict, List, Optional
 
 import customtkinter as ctk
+
 from ..theme import COLORS
 from .base_viewer import ViewerToolbarMixin
 

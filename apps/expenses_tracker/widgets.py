@@ -1,7 +1,8 @@
 """Reusable styled UI components."""
 
 import tkinter as tk
-from config import COLORS, CATEGORIES
+
+from config import CATEGORIES, COLORS
 
 
 class StyledButton(tk.Canvas):

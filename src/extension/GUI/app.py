@@ -11,17 +11,17 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 
-from .theme import COLORS
-from .widgets import (
-    StatsCard,
-    PerformanceGraph,
-    AgentFlow,
-    ConversationViewer,
-    ReportViewer,
-    CoverageViewer,
-)
 from .log_parser import LogParser
 from .pipeline_runner import PipelineRunner
+from .theme import COLORS
+from .widgets import (
+    AgentFlow,
+    ConversationViewer,
+    CoverageViewer,
+    PerformanceGraph,
+    ReportViewer,
+    StatsCard,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -62,7 +62,7 @@ IMPLEMENTATION_SYSTEM_PROMPT = """You are a Senior SDET specializing in Python a
   ```python
   from unittest.mock import patch, MagicMock
   import runpy
-  
+
   def test_main_starts_server():
       mock_httpd = MagicMock()
       mock_httpd.serve_forever.side_effect = KeyboardInterrupt()

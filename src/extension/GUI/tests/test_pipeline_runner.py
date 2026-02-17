@@ -1,7 +1,9 @@
 """Unit tests for PipelineRunner module."""
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
+
 from src.extension.GUI.pipeline_runner import PipelineRunner
 
 

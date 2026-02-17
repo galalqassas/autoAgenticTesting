@@ -1,6 +1,7 @@
 """Agent flow widget for visualizing sequential agent interactions."""
 
 import customtkinter as ctk
+
 from ..theme import COLORS
 
 

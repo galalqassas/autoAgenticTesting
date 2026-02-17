@@ -24,27 +24,25 @@ from typing import Optional
 
 # Import LLM configuration and client
 from llm_config import create_llm_client
-# ==================== Type Definitions ====================
+from pipeline.agents import (
+    EvaluationAgent,
+    IdentificationAgent,
+    ImplementationAgent,
+)
+from pipeline.governance import FailureReason, governance_log
 
+# ==================== Type Definitions ====================
 from pipeline.models import (
-    TestScenariosOutput,
     TestEvaluationOutput,
+    TestScenariosOutput,
 )
 
 # ==================== System Prompts ====================
-
 from pipeline.test_runner import (
     extract_dependencies,
     install_dependencies,
     run_tests,
 )
-from pipeline.agents import (
-    IdentificationAgent,
-    ImplementationAgent,
-    EvaluationAgent,
-)
-from pipeline.governance import governance_log, FailureReason
-
 
 # ==================== Pipeline Implementation ====================
 

@@ -1,7 +1,6 @@
 import importlib.metadata
 
 
-
 def check_deps(packages):
     print(f"Checking packages: {packages}")
 

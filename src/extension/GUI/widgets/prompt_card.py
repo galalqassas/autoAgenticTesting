@@ -1,6 +1,7 @@
 """PromptCard Widget - Displays a prompt entry with collapsible sections."""
 
 import customtkinter as ctk
+
 from ..theme import COLORS
 
 

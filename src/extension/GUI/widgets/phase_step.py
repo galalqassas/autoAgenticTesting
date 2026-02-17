@@ -1,6 +1,7 @@
 """Phase step widget for the progress stepper."""
 
 import customtkinter as ctk
+
 from ..theme import COLORS
 
 

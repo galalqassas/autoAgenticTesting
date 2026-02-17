@@ -14,25 +14,28 @@ export function deepClone<T>(obj: T): T {
 	if (obj instanceof RegExp) {
 		return obj;
 	}
-	const result: any = Array.isArray(obj) ? [] : {};
-	Object.entries(obj).forEach(([key, value]) => {
+	if (Array.isArray(obj)) {
+		return obj.map(item => deepClone(item)) as unknown as T;
+	}
+	const result: Record<string, unknown> = {};
+	Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
 		result[key] = value && typeof value === 'object' ? deepClone(value) : value;
 	});
-	return result;
+	return result as T;
 }
 
 export function deepFreeze<T>(obj: T): T {
 	if (!obj || typeof obj !== 'object') {
 		return obj;
 	}
-	const stack: any[] = [obj];
+	const stack: unknown[] = [obj];
 	while (stack.length > 0) {
-		const obj = stack.shift();
+		const obj = stack.shift() as Record<string, unknown>;
 		Object.freeze(obj);
 		for (const key in obj) {
 			if (_hasOwnProperty.call(obj, key)) {
 				const prop = obj[key];
-				if (typeof prop === 'object' && !Object.isFrozen(prop) && !isTypedArray(prop)) {
+				if (typeof prop === 'object' && prop !== null && !Object.isFrozen(prop) && !isTypedArray(prop)) {
 					stack.push(prop);
 				}
 			}
@@ -44,11 +47,11 @@ export function deepFreeze<T>(obj: T): T {
 const _hasOwnProperty = Object.prototype.hasOwnProperty;
 
 
-export function cloneAndChange(obj: any, changer: (orig: any) => any): any {
+export function cloneAndChange(obj: unknown, changer: (orig: unknown) => unknown): unknown {
 	return _cloneAndChange(obj, changer, new Set());
 }
 
-function _cloneAndChange(obj: any, changer: (orig: any) => any, seen: Set<any>): any {
+function _cloneAndChange(obj: unknown, changer: (orig: unknown) => unknown, seen: Set<unknown>): unknown {
 	if (isUndefinedOrNull(obj)) {
 		return obj;
 	}
@@ -59,7 +62,7 @@ function _cloneAndChange(obj: any, changer: (orig: any) => any, seen: Set<any>):
 	}
 
 	if (Array.isArray(obj)) {
-		const r1: any[] = [];
+		const r1: unknown[] = [];
 		for (const e of obj) {
 			r1.push(_cloneAndChange(e, changer, seen));
 		}
@@ -72,9 +75,10 @@ function _cloneAndChange(obj: any, changer: (orig: any) => any, seen: Set<any>):
 		}
 		seen.add(obj);
 		const r2: Record<string, unknown> = {};
-		for (const i2 in obj) {
-			if (_hasOwnProperty.call(obj, i2)) {
-				r2[i2] = _cloneAndChange(obj[i2], changer, seen);
+		const source = obj as Record<string, unknown>;
+		for (const i2 in source) {
+			if (_hasOwnProperty.call(source, i2)) {
+				r2[i2] = _cloneAndChange(source[i2], changer, seen);
 			}
 		}
 		seen.delete(obj);
@@ -88,30 +92,32 @@ function _cloneAndChange(obj: any, changer: (orig: any) => any, seen: Set<any>):
  * Copies all properties of source into destination. The optional parameter "overwrite" allows to control
  * if existing properties on the destination should be overwritten or not. Defaults to true (overwrite).
  */
-export function mixin(destination: any, source: any, overwrite: boolean = true): any {
+export function mixin(destination: unknown, source: unknown, overwrite: boolean = true): unknown {
 	if (!isObject(destination)) {
 		return source;
 	}
 
 	if (isObject(source)) {
-		Object.keys(source).forEach(key => {
-			if (key in destination) {
+		const dest = destination as Record<string, unknown>;
+		const src = source as Record<string, unknown>;
+		Object.keys(src).forEach(key => {
+			if (key in dest) {
 				if (overwrite) {
-					if (isObject(destination[key]) && isObject(source[key])) {
-						mixin(destination[key], source[key], overwrite);
+					if (isObject(dest[key]) && isObject(src[key])) {
+						mixin(dest[key], src[key], overwrite);
 					} else {
-						destination[key] = source[key];
+						dest[key] = src[key];
 					}
 				}
 			} else {
-				destination[key] = source[key];
+				dest[key] = src[key];
 			}
 		});
 	}
 	return destination;
 }
 
-export function equals(one: any, other: any): boolean {
+export function equals(one: unknown, other: unknown): boolean {
 	if (one === other) {
 		return true;
 	}
@@ -132,23 +138,26 @@ export function equals(one: any, other: any): boolean {
 	let key: string;
 
 	if (Array.isArray(one)) {
-		if (one.length !== other.length) {
+		const otherArray = other as unknown[];
+		if (one.length !== otherArray.length) {
 			return false;
 		}
 		for (i = 0; i < one.length; i++) {
-			if (!equals(one[i], other[i])) {
+			if (!equals(one[i], otherArray[i])) {
 				return false;
 			}
 		}
 	} else {
+		const oneObj = one as Record<string, unknown>;
+		const otherObj = other as Record<string, unknown>;
 		const oneKeys: string[] = [];
 
-		for (key in one) {
+		for (key in oneObj) {
 			oneKeys.push(key);
 		}
 		oneKeys.sort();
 		const otherKeys: string[] = [];
-		for (key in other) {
+		for (key in otherObj) {
 			otherKeys.push(key);
 		}
 		otherKeys.sort();
@@ -156,7 +165,7 @@ export function equals(one: any, other: any): boolean {
 			return false;
 		}
 		for (i = 0; i < oneKeys.length; i++) {
-			if (!equals(one[oneKeys[i]], other[oneKeys[i]])) {
+			if (!equals(oneObj[oneKeys[i]], otherObj[oneKeys[i]])) {
 				return false;
 			}
 		}
@@ -169,8 +178,8 @@ export function equals(one: any, other: any): boolean {
  * This prevents `JSON`.stringify` from throwing the exception
  *  "Uncaught TypeError: Converting circular structure to JSON"
  */
-export function safeStringify(obj: any): string {
-	const seen = new Set<any>();
+export function safeStringify(obj: unknown): string {
+	const seen = new Set<unknown>();
 	return JSON.stringify(obj, (key, value) => {
 		if (isObject(value) || Array.isArray(value)) {
 			if (seen.has(value)) {
@@ -186,7 +195,7 @@ export function safeStringify(obj: any): string {
 	});
 }
 
-type obj = { [key: string]: any };
+type obj = { [key: string]: unknown };
 /**
  * Returns an object that has keys for each value that is different in the base object. Keys
  * that do not exist in the target but in the base object are not considered.
@@ -223,7 +232,7 @@ export function getCaseInsensitive(target: obj, key: string): unknown {
 	return equivalentKey ? target[equivalentKey] : target[key];
 }
 
-export function filter(obj: obj, predicate: (key: string, value: any) => boolean): obj {
+export function filter(obj: obj, predicate: (key: string, value: unknown) => boolean): obj {
 	const result = Object.create(null);
 	for (const [key, value] of Object.entries(obj)) {
 		if (predicate(key, value)) {

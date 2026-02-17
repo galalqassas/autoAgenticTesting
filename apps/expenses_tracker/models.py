@@ -1,10 +1,11 @@
 """Data models and storage for expenses."""
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import List
+
 from config import DATA_FILE
 
 

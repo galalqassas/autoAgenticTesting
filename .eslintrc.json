@@ -1,0 +1,48 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ],
+    "@typescript-eslint/no-empty-function": "off",
+    "@typescript-eslint/no-namespace": "off",
+    "no-useless-escape": "off",
+    "@typescript-eslint/no-empty-object-type": "off",
+    "@typescript-eslint/no-unsafe-function-type": "off",
+    "no-constant-condition": "off",
+    "@typescript-eslint/no-duplicate-enum-values": "off",
+    "no-inner-declarations": "off",
+    "no-cond-assign": "warn",
+    "prefer-rest-params": "warn",
+    "@typescript-eslint/no-this-alias": "off",
+    "@typescript-eslint/no-unnecessary-type-constraint": "off",
+    "no-empty": "warn",
+    "no-fallthrough": "warn",
+    "prefer-const": "warn",
+    "no-prototype-builtins": "off",
+    "no-control-regex": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/util/vs/**/*.ts"],
+      "rules": {
+        "local/code-no-any-casts": "off",
+        "local/code-no-dangerous-type-assertions": "off",
+        "local/code-import-patterns": "off"
+      }
+    }
+  ]
+}

@@ -34,7 +34,7 @@ export interface IToolCallRound {
 
 export interface InternalToolReference extends vscode.ChatLanguageModelToolReference {
 	readonly id: string;
-	readonly input?: Object; // Allows to pass input to tool invocations internally
+	readonly input?: object; // Allows to pass input to tool invocations internally
 }
 
 export namespace InternalToolReference {

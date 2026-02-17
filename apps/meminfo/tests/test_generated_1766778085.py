@@ -1,9 +1,9 @@
-import sys
 import runpy
+import sys
 import threading
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,7 +15,6 @@ import file_reader  # noqa: E402
 import groq_client  # noqa: E402
 import main  # noqa: E402
 import prompt_templates  # noqa: E402
-
 
 # ---------- Helper fixtures ----------
 

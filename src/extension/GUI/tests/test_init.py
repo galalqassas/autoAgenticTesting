@@ -6,25 +6,25 @@ class TestPackageExports:
 
     def test_gui_package_exports(self):
         """GUI package should export PipelineGUI."""
-        from src.extension.GUI import PipelineGUI
         import src.extension.GUI as gui
+        from src.extension.GUI import PipelineGUI
 
         assert PipelineGUI is not None
         assert gui.__all__ == ["PipelineGUI"]
 
     def test_widgets_package_exports(self):
         """Widgets package should export all widgets."""
-        from src.extension.GUI.widgets import (
-            PhaseStep,
-            StatsCard,
-            PerformanceGraph,
-            AgentFlow,
-            PromptCard,
-            ConversationViewer,
-            ReportViewer,
-            CoverageViewer,
-        )
         import src.extension.GUI.widgets as widgets
+        from src.extension.GUI.widgets import (
+            AgentFlow,
+            ConversationViewer,
+            CoverageViewer,
+            PerformanceGraph,
+            PhaseStep,
+            PromptCard,
+            ReportViewer,
+            StatsCard,
+        )
 
         assert all(
             isinstance(w, type)
