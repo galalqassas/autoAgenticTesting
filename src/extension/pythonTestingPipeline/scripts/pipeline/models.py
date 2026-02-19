@@ -11,6 +11,12 @@ __all__ = [
     "TestEvaluationOutput",
     "MutantInfo",
     "MutationCoverageReport",
+    # Statement coverage
+    "StatementCoverageReport",
+    # Branch coverage
+    "BranchArmReport",
+    "BranchReport",
+    "BranchCoverageReport",
 ]
 
 
@@ -84,3 +90,55 @@ class TestEvaluationOutput:
     has_severe_security_issues: bool = False
     mutation_score: float = 0.0
     mutation_report: Optional[MutationCoverageReport] = None
+
+
+# ── Statement Coverage ──────────────────────────────────────────────
+
+
+@dataclass
+class StatementCoverageReport:
+    """Statement-level coverage for a single file.
+
+    Each AST statement node (Assign, Return, Expr, Raise, Assert, …) is
+    mapped to executed_lines from coverage.json.  Multiple statements
+    sharing the same ``lineno`` are counted once per line.
+    """
+
+    total_statements: int
+    covered_statements: int
+    uncovered_statement_lines: List[int] = field(default_factory=list)
+    coverage_percentage: float = 0.0
+
+
+# ── Branch Coverage ─────────────────────────────────────────────────
+
+
+@dataclass
+class BranchArmReport:
+    """One arm of a branch construct (e.g. the 'body' or 'orelse' of an if)."""
+
+    arm_name: str  # e.g. "if-body", "else", "except:ValueError"
+    start_line: int
+    covered: bool
+
+
+@dataclass
+class BranchReport:
+    """A single branch construct (if, try, for/while with else, match)."""
+
+    lineno: int
+    construct: str  # "if", "try", "for", "while", "match"
+    arms: List[BranchArmReport] = field(default_factory=list)
+    fully_covered: bool = False
+
+
+@dataclass
+class BranchCoverageReport:
+    """Aggregated branch coverage for a single file."""
+
+    total_branches: int
+    fully_covered: int
+    partially_covered: int
+    uncovered: int
+    branches: List[BranchReport] = field(default_factory=list)
+    coverage_percentage: float = 0.0

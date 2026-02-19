@@ -3,9 +3,12 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 from pipeline.code_utils import extract_code_definitions
+from pipeline.controlflow import analyze_branch_coverage
+from pipeline.models import BranchCoverageReport, StatementCoverageReport
+from pipeline.structural import analyze_statement_coverage
 
 __all__ = ["FileCoverageReport", "FunctionCoverageReport", "analyze_coverage", "format_uncovered_areas", "get_overall_percentage"]
 
@@ -32,6 +35,8 @@ class FileCoverageReport:
     uncovered_lines: List[int]
     coverage_percentage: float
     functions: List[FunctionCoverageReport]
+    statement_coverage: Optional[StatementCoverageReport] = None
+    branch_coverage: Optional[BranchCoverageReport] = None
 
 
 def _calc_pct(covered: int, total: int) -> float:
@@ -104,6 +109,20 @@ def analyze_coverage(coverage_json_path: Path, source_root: Path) -> Dict[str, F
         all_lines = (executed | missing) - excluded
         covered_count = len(executed - excluded)
 
+        # Statement coverage
+        try:
+            stmt_report = analyze_statement_coverage(
+                source_code, executed, missing, excluded,
+            )
+        except Exception:
+            stmt_report = None
+
+        # Branch coverage
+        try:
+            branch_report = analyze_branch_coverage(source_code, executed)
+        except Exception:
+            branch_report = None
+
         reports[file_path] = FileCoverageReport(
             file_path=file_path,
             total_lines=len(all_lines),
@@ -111,6 +130,8 @@ def analyze_coverage(coverage_json_path: Path, source_root: Path) -> Dict[str, F
             uncovered_lines=sorted(missing),
             coverage_percentage=_calc_pct(covered_count, len(all_lines)),
             functions=function_reports,
+            statement_coverage=stmt_report,
+            branch_coverage=branch_report,
         )
 
     return reports

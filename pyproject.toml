@@ -2,6 +2,12 @@
 line-length = 200
 # Ignore E402 (Module level import not at top of file)
 ignore = ["E402"]
+exclude = ["apps"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["src"]
+norecursedirs = ["apps", "node_modules", "dist"]

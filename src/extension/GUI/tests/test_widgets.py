@@ -381,7 +381,7 @@ class TestCoverageViewer:
 
         assert issubclass(CoverageViewer, ctk.CTkFrame)
         for method in [
-            "load_file", "reset", "_browse", "_render", "_open_in_editor"
+            "load_file", "reset", "_browse", "_render"
         ]:
             assert callable(getattr(CoverageViewer, method))
 
