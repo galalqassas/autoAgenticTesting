@@ -263,11 +263,14 @@ def analyze_branch_coverage(
     )
     uncovered = total - fully - partial
 
+    total_arms = sum(len(b.arms) for b in all_branches)
+    covered_arms = sum(1 for b in all_branches for a in b.arms if a.covered)
+
     return BranchCoverageReport(
         total_branches=total,
         fully_covered=fully,
         partially_covered=partial,
         uncovered=uncovered,
         branches=all_branches,
-        coverage_percentage=_calc_pct(fully, total),
+        coverage_percentage=_calc_pct(covered_arms, total_arms),
     )

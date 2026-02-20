@@ -134,13 +134,14 @@ class TestPipelineGUIMethods:
         """Create mocked PipelineGUI."""
         with patch("customtkinter.CTk.__init__", return_value=None):
             with patch("src.extension.GUI.app.PipelineGUI._setup_window"):
-                with patch(
-                    "src.extension.GUI.app.PipelineGUI._init_components"
-                ):
+                with patch("src.extension.GUI.app.PipelineGUI._init_components"):
                     with patch("src.extension.GUI.app.PipelineGUI._build_ui"):
-                        from src.extension.GUI.app import PipelineGUI
+                        with patch("tkinterdnd2.TkinterDnD._require", return_value="2.9.2"):
+                            with patch("src.extension.GUI.app.PipelineGUI.drop_target_register"):
+                                with patch("src.extension.GUI.app.PipelineGUI.dnd_bind"):
+                                    from src.extension.GUI.app import PipelineGUI
 
-                        gui = PipelineGUI()
+                                    gui = PipelineGUI()
                         gui.runner = Mock(is_running=False)
                         gui.parser = Mock()
                         gui.phases = {
@@ -230,3 +231,20 @@ class TestPipelineGUIMethods:
             mock_gui._process_line("Agent 1: Identifying")
             mock_gui.agent_flow.add_agent.assert_called_with(1)
             mock_gui.stats_cards["coverage"].update_stats.assert_called()
+
+    def test_on_drop_path(self, mock_gui):
+        """_on_drop_path should strip brackets and update entry."""
+        class MockEvent:
+            data = "{/path/to/folder}"
+
+        mock_gui._on_drop_path(MockEvent())
+        mock_gui.path_entry.delete.assert_called_with(0, "end")
+        mock_gui.path_entry.insert.assert_called_with(0, "/path/to/folder")
+
+        # Test without brackets
+        class MockEventNoBrackets:
+            data = "/path/to/folder2"
+
+        mock_gui.path_entry.reset_mock()
+        mock_gui._on_drop_path(MockEventNoBrackets())
+        mock_gui.path_entry.insert.assert_called_with(0, "/path/to/folder2")

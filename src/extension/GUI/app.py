@@ -10,6 +10,7 @@ from pathlib import Path
 from tkinter import filedialog
 
 import customtkinter as ctk
+from tkinterdnd2 import DND_FILES, TkinterDnD
 
 from .log_parser import LogParser
 from .pipeline_runner import PipelineRunner
@@ -26,7 +27,7 @@ from .widgets import (
 logger = logging.getLogger(__name__)
 
 
-class PipelineGUI(ctk.CTk):
+class PipelineGUI(ctk.CTk, TkinterDnD.DnDWrapper):
     """Main Pipeline GUI Application."""
 
     PHASES = [("Identify", "🔍"), ("Implement", "⚙️"), ("Verify", "✓")]
@@ -44,9 +45,14 @@ class PipelineGUI(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+        self.TkdndVersion = TkinterDnD._require(self)
         self._setup_window()
         self._init_components()
         self._build_ui()
+
+        # Setup Drag and Drop for the whole window
+        self.drop_target_register(DND_FILES)
+        self.dnd_bind('<<Drop>>', self._on_drop_path)
 
     def _setup_window(self):
         """Configure window properties."""
@@ -372,6 +378,14 @@ class PipelineGUI(ctk.CTk):
         if folder := filedialog.askdirectory(title="Select Target Codebase"):
             self.path_entry.delete(0, "end")
             self.path_entry.insert(0, folder)
+
+    def _on_drop_path(self, event):
+        """Handle folder drag and drop."""
+        path = event.data
+        if path.startswith('{') and path.endswith('}'):
+            path = path[1:-1]
+        self.path_entry.delete(0, "end")
+        self.path_entry.insert(0, path)
 
     def _toggle_pipeline(self):
         """Start or stop the pipeline."""

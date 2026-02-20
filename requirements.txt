@@ -13,6 +13,7 @@ matplotlib>=3.7.0
 
 # GUI
 customtkinter>=5.0.0
+tkinterdnd2>=0.3.0
 
 # Utilities
 python-dotenv>=1.0.0
