@@ -340,6 +340,7 @@ omit =
         "--tb=short",
         "--timeout=30",  # Per-test timeout of 30 seconds
         f"--cov={source_dir}",
+        "--cov-branch",
         "--cov-report=term-missing",
         "--cov-report=json",
     ]

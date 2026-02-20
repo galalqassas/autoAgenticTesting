@@ -37,6 +37,8 @@ class FileCoverageReport:
     functions: List[FunctionCoverageReport]
     statement_coverage: Optional[StatementCoverageReport] = None
     branch_coverage: Optional[BranchCoverageReport] = None
+    total_branches: int = 0
+    covered_branches: int = 0
 
 
 def _calc_pct(covered: int, total: int) -> float:
@@ -74,6 +76,9 @@ def analyze_coverage(coverage_json_path: Path, source_root: Path) -> Dict[str, F
         missing: Set[int] = set(file_data.get("missing_lines", []))
         excluded: Set[int] = set(file_data.get("excluded_lines", []))
 
+        executed_branches = file_data.get("executed_branches", [])
+        missing_branches = file_data.get("missing_branches", [])
+
         # Resolve source path
         source_path = Path(file_path)
         if not source_path.exists():
@@ -109,6 +114,9 @@ def analyze_coverage(coverage_json_path: Path, source_root: Path) -> Dict[str, F
         all_lines = (executed | missing) - excluded
         covered_count = len(executed - excluded)
 
+        total_operations = len(all_lines) + len(executed_branches) + len(missing_branches)
+        covered_operations = covered_count + len(executed_branches)
+
         # Statement coverage
         try:
             stmt_report = analyze_statement_coverage(
@@ -128,10 +136,12 @@ def analyze_coverage(coverage_json_path: Path, source_root: Path) -> Dict[str, F
             total_lines=len(all_lines),
             covered_lines=covered_count,
             uncovered_lines=sorted(missing),
-            coverage_percentage=_calc_pct(covered_count, len(all_lines)),
+            coverage_percentage=_calc_pct(covered_operations, total_operations),
             functions=function_reports,
             statement_coverage=stmt_report,
             branch_coverage=branch_report,
+            total_branches=len(executed_branches) + len(missing_branches),
+            covered_branches=len(executed_branches),
         )
 
     return reports
@@ -148,6 +158,6 @@ def format_uncovered_areas(reports: Dict[str, FileCoverageReport]) -> str:
 
 def get_overall_percentage(reports: Dict[str, FileCoverageReport]) -> float:
     """Calculate overall coverage percentage across all files."""
-    total = sum(r.total_lines for r in reports.values())
-    covered = sum(r.covered_lines for r in reports.values())
+    total = sum(r.total_lines + r.total_branches for r in reports.values())
+    covered = sum(r.covered_lines + r.covered_branches for r in reports.values())
     return _calc_pct(covered, total)

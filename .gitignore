@@ -44,5 +44,3 @@ tests/prompts_*.json
 
 apps/tests
 apps/*.json
-
-apps
