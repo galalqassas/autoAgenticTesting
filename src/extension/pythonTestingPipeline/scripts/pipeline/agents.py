@@ -59,11 +59,10 @@ class BaseAgent:
             risk_level="medium" if not is_mock else "low",
         )
 
-        # Record the prompt after the call
         prompt_record = {
             "timestamp": timestamp,
             "agent": agent_name,
-            "model": self.llm_client.current_model,
+            "model": getattr(self.llm_client, "last_used_model", None) or self.llm_client.current_model,
             "system_prompt": system_prompt,
             "user_prompt": user_prompt,
             "response": response,
@@ -165,7 +164,7 @@ Respond with JSON containing test_scenarios."""
         prompt_record = {
             "timestamp": timestamp,
             "agent": "identification_agent",
-            "model": llm_client.current_model,
+            "model": getattr(llm_client, "last_used_model", None) or llm_client.current_model,
             "system_prompt": IDENTIFICATION_SYSTEM_PROMPT,
             "user_prompt": user_prompt,
             "response": response,

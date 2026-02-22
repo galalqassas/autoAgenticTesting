@@ -82,7 +82,7 @@ class PythonTestingPipeline:
         prompt_data = {
             "run_id": run_id,
             "timestamp": time_module.strftime("%Y-%m-%d %H:%M:%S"),
-            "model": self.model,
+            "model": getattr(self.llm_client, "last_used_model", None) or self.model,
             "total_prompts": len(self.prompt_history),
             "prompts": self.prompt_history,
         }
@@ -130,7 +130,7 @@ Be concise and professional."""
 
 **Status:** {status_icon} {results.get("status", "unknown").upper()}
 **Generated:** {time_module.strftime("%Y-%m-%d %H:%M:%S")}
-**Model:** {self.model}
+**Model:** {getattr(self.llm_client, "last_used_model", None) or self.model}
 
 ## Summary
 
